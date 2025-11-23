@@ -476,6 +476,9 @@ export default class ExcalidrawPlugin extends Plugin {
               });
             });
           });
+          if (message.event === "save") {
+            postMessage({ action: 'savedone' });
+          }
         }
 
         const onBrowseLibrary = (message: any) => {
@@ -496,7 +499,7 @@ export default class ExcalidrawPlugin extends Plugin {
                 if (message.event == "init") {
                   onInit(message);
                 }
-                else if (message.event == "save") {
+                else if (message.event == "save" || message.event == "autosave") {
                   onSave(message);
                 }
                 else if (message.event == "browseLibrary") {
@@ -513,9 +516,24 @@ export default class ExcalidrawPlugin extends Plugin {
           }
         };
 
+        const switchFullscreen = () => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            this.element.requestFullscreen();
+          }
+        }
+        const keydownEventHandleer = (event: KeyboardEvent) => {
+          if (event.key.toLowerCase() === 'y' && (event.altKey || event.metaKey)) {
+            switchFullscreen();
+          }
+        };
+
         window.addEventListener("message", messageEventHandler);
+        iframe.contentWindow.addEventListener("keydown", keydownEventHandleer);
         this.beforeDestroy = () => {
           window.removeEventListener("message", messageEventHandler);
+          iframe.contentWindow.removeEventListener("keydown", keydownEventHandleer);
         };
       }
     });
@@ -584,6 +602,9 @@ export default class ExcalidrawPlugin extends Plugin {
           });
         });
       });
+      if (message.event === "save") {
+        postMessage({ action: 'savedone' });
+      }
     }
 
     const onBrowseLibrary = (message: any) => {
@@ -644,7 +665,7 @@ export default class ExcalidrawPlugin extends Plugin {
             if (message.event == "init") {
               onInit(message);
             }
-            else if (message.event == "save") {
+            else if (message.event == "save" || message.event == "autosave") {
               onSave(message);
             }
             else if (message.event == "browseLibrary") {
