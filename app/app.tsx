@@ -14,6 +14,7 @@ import {
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import { blobToDataURL, dataURLToBlob, mimeTypeOfDataURL, unicodeToBase64 } from '../src/utils';
+import { matchHotKey } from '../src/utils/hotkey';
 
 window.EXCALIDRAW_ASSET_PATH = '/plugins/siyuan-embed-excalidraw/app/';
 window.EXCALIDRAW_LIBRARY_PATH = '/data/storage/petal/siyuan-embed-excalidraw/library.excalidrawlib';
@@ -261,7 +262,8 @@ if (libraryUrlTokens) {
 }
 
 window.addEventListener('keydown', (event: KeyboardEvent) => {
-  if (event.key.toLowerCase() === 's' && (event.ctrlKey || event.metaKey)) {
+  if (matchHotKey('⌘S', event)) {
+    event.preventDefault();
     save("save");
   }
 });
