@@ -41,6 +41,7 @@
 - [x] 全屏编辑
 - [x] 明暗模式
 - [x] Tab/Dialog窗口编辑
+- [x] 自定义代码片段
 - [ ] 支持Excalidraw中显示思源文档内容
 
 > 如有更多需求/建议欢迎[在GitHub仓库中提issue](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues)或[在思源笔记社区中发帖](https://ld246.com/article/1763408501738)
@@ -55,13 +56,22 @@
 
 **Excalidraw图像块标签：** 可在插件设置中修改Excalidraw图像块的标签显示模式。
 
+**Excalidraw代码片段：** 在思源笔记的代码片段中创建CSS/JS代码片段（不必启用），然后在本插件设置中选择其中在Excalidraw中开启的代码片段，实现自定义的功能与样式。可也在[思源社区Excalidraw代码片段集市](https://ld246.com/article/1764004088153)中获取所需代码片段。
+
 **从其他来源迁移：** 
 
 + 方案1：只需要在任意Excalidraw平台导出SVG/PNG图像时勾选 `包含画布数据` 选项，再把SVG图像拖入思源笔记中即可，不用担心以后没法再迁移，这个SVG/PNG图像也是可以导入到任意Excalidraw平台再次编辑的。
 + 方案2：在任意Excalidraw平台内复制全部内容，在思源笔记中输入 `/excalidraw` 命令创建新Excalidraw图像，然后将复制的内容粘贴进弹出Excalidraw窗口中即可。
 
+<details>
+<summary>如果你觉得有用，欢迎请我喝杯咖啡☕</summary>
+<img src="https://b3logfile.com/file/2025/11/406da93ac6582784bc3e2863323d926a-OpXNyUO.jpg" width="400px">
+</details> 
+
 ## 更新日志
 
++ v0.4.0
+    + 新增功能：支持自定义代码片段 (JS/CSS)
 + v0.3.6
     + 新增功能：页签切换快捷键
     + 修复：网页中保存触发网页保存

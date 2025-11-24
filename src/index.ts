@@ -3,6 +3,7 @@ import {
   Plugin,
   getFrontend,
   fetchPost,
+  fetchSyncPost,
   IWebSocketData,
   getAllEditor,
   getAllModels,
@@ -132,11 +133,11 @@ export default class ExcalidrawPlugin extends Plugin {
 
     // 配置的处理拷贝自思源源码
     const contentElement = dialog.element.querySelector(".b3-dialog__content");
-    this.settingItems.forEach((item) => {
+    this.settingItems.forEach(async (item) => {
       let html = "";
       let actionElement = item.actionElement;
       if (!item.actionElement && item.createActionElement) {
-        actionElement = item.createActionElement();
+        actionElement = await item.createActionElement();
       }
       const tagName = actionElement?.classList.contains("b3-switch") ? "label" : "div";
       if (typeof item.direction === "undefined") {
@@ -186,6 +187,7 @@ export default class ExcalidrawPlugin extends Plugin {
       this.data[STORAGE_NAME].fullscreenEdit = (dialog.element.querySelector("[data-type='fullscreenEdit']") as HTMLInputElement).checked;
       this.data[STORAGE_NAME].editWindow = (dialog.element.querySelector("[data-type='editWindow']") as HTMLSelectElement).value;
       this.data[STORAGE_NAME].themeMode = (dialog.element.querySelector("[data-type='themeMode']") as HTMLSelectElement).value;
+      this.data[STORAGE_NAME].snippets = Array.from(dialog.element.querySelectorAll("[data-type='snippets'] input[data-id]:checked")).map(element => element.getAttribute("data-id"));
       this.saveData(STORAGE_NAME, this.data[STORAGE_NAME]);
       this.reloadAllEditor();
       this.removeAllExcalidrawTab();
@@ -201,13 +203,14 @@ export default class ExcalidrawPlugin extends Plugin {
     if (typeof this.data[STORAGE_NAME].fullscreenEdit === 'undefined') this.data[STORAGE_NAME].fullscreenEdit = false;
     if (typeof this.data[STORAGE_NAME].editWindow === 'undefined') this.data[STORAGE_NAME].editWindow = 'dialog';
     if (typeof this.data[STORAGE_NAME].themeMode === 'undefined') this.data[STORAGE_NAME].themeMode = "themeLight";
+    if (typeof this.data[STORAGE_NAME].snippets === 'undefined') this.data[STORAGE_NAME].snippets = [];
 
     this.settingItems = [
       {
         title: this.i18n.labelDisplay,
         direction: "column",
         description: this.i18n.labelDisplayDescription,
-        createActionElement: () => {
+        createActionElement: async () => {
           const options = ["noLabel", "showLabelAlways", "showLabelOnHover"];
           const optionsHTML = options.map(option => {
             const isSelected = String(option) === String(this.data[STORAGE_NAME].labelDisplay);
@@ -220,7 +223,7 @@ export default class ExcalidrawPlugin extends Plugin {
         title: this.i18n.embedImageFormat,
         direction: "column",
         description: this.i18n.embedImageFormatDescription,
-        createActionElement: () => {
+        createActionElement: async () => {
           const options = ["svg", "png"];
           const optionsHTML = options.map(option => {
             const isSelected = String(option) === String(this.data[STORAGE_NAME].embedImageFormat);
@@ -233,7 +236,7 @@ export default class ExcalidrawPlugin extends Plugin {
         title: this.i18n.fullscreenEdit,
         direction: "column",
         description: this.i18n.fullscreenEditDescription,
-        createActionElement: () => {
+        createActionElement: async () => {
           const element = HTMLToElement(`<input type="checkbox" class="b3-switch fn__flex-center" data-type="fullscreenEdit">`) as HTMLInputElement;
           element.checked = this.data[STORAGE_NAME].fullscreenEdit;
           return element;
@@ -243,7 +246,7 @@ export default class ExcalidrawPlugin extends Plugin {
         title: this.i18n.editWindow,
         direction: "column",
         description: this.i18n.editWindowDescription,
-        createActionElement: () => {
+        createActionElement: async () => {
           const options = ["dialog", "tab"];
           const optionsHTML = options.map(option => {
             const isSelected = String(option) === String(this.data[STORAGE_NAME].editWindow);
@@ -256,13 +259,41 @@ export default class ExcalidrawPlugin extends Plugin {
         title: this.i18n.themeMode,
         direction: "column",
         description: this.i18n.themeModeDescription,
-        createActionElement: () => {
+        createActionElement: async () => {
           const options = ["themeLight", "themeDark", "themeOS"];
           const optionsHTML = options.map(option => {
             const isSelected = String(option) === String(this.data[STORAGE_NAME].themeMode);
             return `<option value="${option}"${isSelected ? " selected" : ""}>${window.siyuan.languages[option]}</option>`;
           }).join("");
           return HTMLToElement(`<select class="b3-select fn__flex-center" data-type="themeMode">${optionsHTML}</select>`);
+        },
+      },
+      {
+        title: this.i18n.snippets,
+        direction: "row",
+        description: this.i18n.snippetsDescription,
+        createActionElement: async () => {
+          const snippets = await this.getSnippets();
+          const optionsHTML = snippets.map(snippet => {
+            const isSelected = this.data[STORAGE_NAME].snippets.includes(snippet.id);
+            return `
+<div class="fn__hr--small"></div>
+<div class="fn__flex">
+  <div class="b3-chip b3-chip--small ${snippet.type === 'css' ? "b3-chip--primary" : "b3-chip--secondary"}">${snippet.type.toUpperCase()}</div>
+  <div class="fn__space"></div>
+  <div class="fn__flex-1">${snippet.name}</div>
+  <div class="fn__space"></div>
+  <input type="checkbox" class="b3-switch fn__flex-center" data-id="${snippet.id}" />
+</div>`;
+          }).join("");
+          const element = HTMLToElement(`<div class="fn__flex-center" data-type="snippets">${optionsHTML}</div>`);
+          this.data[STORAGE_NAME].snippets.forEach(snippet => {
+            const checkbox = element.querySelector(`[data-id="${snippet}"]`) as HTMLInputElement;
+            if (checkbox) {
+              checkbox.checked = true;
+            }
+          });
+          return element;
         },
       },
     ];
@@ -450,7 +481,6 @@ export default class ExcalidrawPlugin extends Plugin {
   private tabHotKeyEventHandler = (event: KeyboardEvent, custom?: Custom) => {
     // 恢复默认处理方式的快捷键
     if (custom) {
-      console.log()
       const isGoToEditTabNext = matchHotKey(getCustomHotKey(window.siyuan.config.keymap.general.goToEditTabNext), event);
       const isGoToEditTabPrev = matchHotKey(getCustomHotKey(window.siyuan.config.keymap.general.goToEditTabPrev), event);
       const isGoToTabNext = matchHotKey(getCustomHotKey(window.siyuan.config.keymap.general.goToTabNext), event);
@@ -524,6 +554,10 @@ export default class ExcalidrawPlugin extends Plugin {
           });
         }
 
+        const onReady = (message: any) => {
+          that.injectSnippetsToIframe(iframe);
+        }
+
         const onSave = (message: any) => {
           imageInfo.data = message.data;
           imageInfo.data = that.fixImageContent(imageInfo.data);
@@ -556,6 +590,9 @@ export default class ExcalidrawPlugin extends Plugin {
                 // console.log(message.event);
                 if (message.event == "init") {
                   onInit(message);
+                }
+                else if (message.event == "ready") {
+                  onReady(message);
                 }
                 else if (message.event == "save" || message.event == "autosave") {
                   onSave(message);
@@ -641,6 +678,10 @@ export default class ExcalidrawPlugin extends Plugin {
       });
     }
 
+    const onReady = (message: any) => {
+      this.injectSnippetsToIframe(iframe);
+    }
+
     const onSave = (message: any) => {
       imageInfo.data = message.data;
       imageInfo.data = this.fixImageContent(imageInfo.data);
@@ -714,6 +755,9 @@ export default class ExcalidrawPlugin extends Plugin {
             if (message.event == "init") {
               onInit(message);
             }
+            else if (message.event == "ready") {
+              onReady(message);
+            }
             else if (message.event == "save" || message.event == "autosave") {
               onSave(message);
             }
@@ -768,5 +812,34 @@ export default class ExcalidrawPlugin extends Plugin {
       }
     }
     return imageDataURL;
+  }
+
+  private async getSnippets(snippetIDs?: string[]): Promise<ISnippet[]> {
+    const response = await fetchSyncPost("/api/snippet/getSnippet", { type: "all", enabled: 2 });
+    if (response.code !== 0) {
+      console.warn(`${this.name}: get snippets failed`);
+    }
+    let snippets = response.data.snippets as ISnippet[];
+    // 当指定snippetIDs时，只返回指定的snippets
+    if (typeof snippetIDs !== 'undefined') {
+      snippets = snippets.filter(snippet => this.data[STORAGE_NAME].snippets.includes(snippet.id));
+    }
+    return snippets;
+  }
+
+  private async injectSnippetsToIframe(iframe: HTMLIFrameElement) {
+    const snippets = await this.getSnippets(this.data[STORAGE_NAME].snippets);
+    snippets.forEach((snippet: ISnippet) => {
+      let snippetElement: HTMLElement;
+      if (snippet.type === 'css') {
+        snippetElement = document.createElement('style');
+        snippetElement.textContent = snippet.content;
+      } else {
+        snippetElement = document.createElement('script');
+        snippetElement.setAttribute('type', 'text/javascript');
+        snippetElement.textContent = snippet.content;
+      }
+      iframe.contentDocument?.head?.appendChild(snippetElement);
+    });
   }
 }

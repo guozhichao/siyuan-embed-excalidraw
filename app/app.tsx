@@ -20,7 +20,6 @@ window.EXCALIDRAW_ASSET_PATH = '/plugins/siyuan-embed-excalidraw/app/';
 window.EXCALIDRAW_LIBRARY_PATH = '/data/storage/petal/siyuan-embed-excalidraw/library.excalidrawlib';
 const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
-let excalidrawAPI: any;
 let currentMimeType = 'image/svg+xml';
 
 const postMessage = (message: any) => {
@@ -28,30 +27,30 @@ const postMessage = (message: any) => {
 };
 
 const save = async (eventName: 'save' | 'autosave') => {
-  if (!excalidrawAPI) return;
+  if (!window.excalidrawAPI) return;
   let imageDataURL = '';
   if (currentMimeType === 'image/svg+xml') {
     const svg = await exportToSvg({
-      elements: excalidrawAPI.getSceneElements(),
+      elements: window.excalidrawAPI.getSceneElements(),
       appState: {
-        ...excalidrawAPI.getAppState(),
+        ...window.excalidrawAPI.getAppState(),
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
       },
-      files: excalidrawAPI.getFiles(),
+      files: window.excalidrawAPI.getFiles(),
     });
     imageDataURL = `data:${currentMimeType};base64,${unicodeToBase64(svg.outerHTML)}`
   } else {
     const blob = await exportToBlob({
-      elements: excalidrawAPI.getSceneElements(),
+      elements: window.excalidrawAPI.getSceneElements(),
       appState: {
-        ...excalidrawAPI.getAppState(),
+        ...window.excalidrawAPI.getAppState(),
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
       },
-      files: excalidrawAPI.getFiles(),
+      files: window.excalidrawAPI.getFiles(),
       mimeType: currentMimeType,
     });
     imageDataURL = await blobToDataURL(blob);
@@ -76,7 +75,7 @@ const App = (props: { initialData: any }) => {
       changeInitStatus = false;
       return;
     }
-    if (!excalidrawAPI) return;
+    if (!window.excalidrawAPI) return;
     debouncedSave();
   };
 
@@ -91,7 +90,10 @@ const App = (props: { initialData: any }) => {
   };
 
   const setExcalidrawAPI = (api: any) => {
-    excalidrawAPI = api;    
+    window.excalidrawAPI = api;
+
+    // 通知已准备好
+    postMessage({ event: 'ready' });
   };
 
   return (
@@ -154,8 +156,8 @@ const onLoad = async (message: any) => {
 };
 
 const onSaveDone = (message: any) => {
-  if (!excalidrawAPI) return;
-  excalidrawAPI.setToast({
+  if (!window.excalidrawAPI) return;
+  window.excalidrawAPI.setToast({
     message: langCode.startsWith('zh') ? '保存成功' : 'Saved',
     closable: true,
     duration: 1000,

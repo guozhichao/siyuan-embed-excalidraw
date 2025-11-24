@@ -156,9 +156,18 @@ interface ExcalidrawImageInfo {
 }
 
 interface SettingItem {
-    title?: string;
-    description?: string;
-    direction?: "row" | "column";
-    actionElement?: HTMLElement;
-    createActionElement?: () => HTMLElement;
+  title?: string;
+  description?: string;
+  direction?: "row" | "column";
+  actionElement?: HTMLElement;
+  createActionElement?: () => Promise<HTMLElement>;
+}
+
+interface ISnippet {
+  id?: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+  content: string;
+  disabledInPublish?: boolean | undefined;
 }

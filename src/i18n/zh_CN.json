@@ -12,5 +12,7 @@
   "editWindow": "编辑窗口",
   "editWindowDescription": "编辑窗口的形式",
   "themeMode": "主题模式",
-  "themeModeDescription": "窗口的主题"
+  "themeModeDescription": "窗口的主题",
+  "snippets": "代码片段",
+  "snippetsDescription": "让思源代码片段在Excalidraw中生效"
 }

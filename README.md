@@ -33,6 +33,7 @@ This plugin serves as the fourth plugin in the **Embed Series**, aiming to provi
 - [x] Fullscreen edit
 - [x] Light/Dark mode
 - [x] Edit in Tab/Dialog
+- [x] Custom Snippets
 - [ ] Support SiYuan block in Excalidraw
 
 > If you have additional feature requests or suggestions, feel free to [open an issue on GitHub](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues) or [post in the SiYuan community](https://ld246.com/article/1763408501738) to request support for additional packages.
@@ -64,14 +65,22 @@ Click the menu button in the top-right corner of the image. If the block is reco
 
 The label of an Excalidraw image block can be configured in the plugin settings.
 
+**Excalidraw Snippets:** Create CSS/JS code snippets (do not enable) in the code snippet editor in SiYuan, then select the code snippet enabled in Excalidraw in the plugin settings to implement custom functionality and styles. You can also find code snippets in the [Excalidraw Code Snippet Marketplace](https://ld246.com/article/1764004088153).
+
 **Migrating from other sources:**
 
 + Method 1: Simply export your diagram as an SVG/PNG from any Excalidraw platform with the "Embed scene" option enabled, then drag the resulting SVG/PNG file into SiYuan.
 + Method 2: Copy all content from any Excalidraw platform, type `/excalidraw` in the editor, and paste the copied content into the pop-up Excalidraw window.
 
+<details>
+<summary>Buy me a coffee☕</summary>
+<img src="https://b3logfile.com/file/2025/11/406da93ac6582784bc3e2863323d926a-OpXNyUO.jpg" width="400px">
+</details> 
 
 ## Changelog
 
++ v0.4.0
+    + Feature: support custom snippets (JS/CSS)
 + v0.3.6
     + Fix: shortcut for Tab Switch
     + Fix: shortcut for save in web page

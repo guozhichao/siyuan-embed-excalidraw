@@ -12,5 +12,7 @@
   "editWindow": "Edit Window Mode",
   "editWindowDescription": "The type of window for editing Excalidraw Image",
   "themeMode": "Theme Mode",
-  "themeModeDescription": "Theme of window"
+  "themeModeDescription": "Theme of window",
+  "snippets": "Snippets",
+  "snippetsDescription": "Make SiYuan snippets available at Excalidraw"
 }
