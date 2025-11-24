@@ -103,6 +103,7 @@ const App = (props: { initialData: any }) => {
       onChange={handleChange}
       onLibraryChange={handleLibraryChange}
       excalidrawAPI={setExcalidrawAPI}
+      validateEmbeddable={true}
       UIOptions={{
         canvasActions: {
           loadScene: false,

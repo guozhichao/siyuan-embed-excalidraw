@@ -79,6 +79,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.4.1
+    + Fix: Embed Web page
 + v0.4.0
     + Feature: support custom snippets (JS/CSS)
 + v0.3.6
