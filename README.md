@@ -72,6 +72,9 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.3.6
+    + Fix: shortcut for Tab Switch
+    + Fix: shortcut for save in web page
 + v0.3.5
     + Fix: shortcut for Tab
 + v0.3.4
