@@ -1,6 +1,6 @@
 // 复制自思源源码
 
-const isMac = () => {
+export const isMac = () => {
     return navigator.platform.toUpperCase().indexOf("MAC") > -1;
 };
 

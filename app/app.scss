@@ -1,0 +1,16 @@
+.excalidraw {
+  .Toast {
+    bottom: unset;
+    top: 53px;
+    left: 15px;
+    margin: 0;
+    width: auto;
+    background-color: transparent;
+
+    .Toast__message {
+      margin: 0;
+      padding-left: 5px;
+      color: var(--color-gray-40);
+    }
+  }
+}

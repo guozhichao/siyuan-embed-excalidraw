@@ -79,6 +79,9 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.4.4
+    + Fix: MacOS click to open
+    + Optimize: toast style
 + v0.4.3
     + Fix: open excalidraw file
 + v0.4.2
