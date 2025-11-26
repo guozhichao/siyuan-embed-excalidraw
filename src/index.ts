@@ -81,15 +81,13 @@ export default class ExcalidrawPlugin extends Plugin {
       id: "excalidraw",
       html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconImage"></use></svg><span class="b3-list-item__text">Excalidraw</span></div>`,
       callback: (protyle, nodeElement) => {
-        setTimeout(() => {
-          this.newExcalidrawImage(nodeElement.dataset.nodeId, (imageInfo) => {
-            if (!this.isMobile && this.data[STORAGE_NAME].editWindow === 'tab') {
-              this.openEditTab(imageInfo);
-            } else {
-              this.openEditDialog(imageInfo);
-            }
-          });
-        }, 500);
+        this.newExcalidrawImage(protyle, (imageInfo) => {
+          if (!this.isMobile && this.data[STORAGE_NAME].editWindow === 'tab') {
+            this.openEditTab(imageInfo);
+          } else {
+            this.openEditDialog(imageInfo);
+          }
+        });
       },
     }];
 
@@ -372,7 +370,7 @@ export default class ExcalidrawPlugin extends Plugin {
     return imageContent;
   }
 
-  public newExcalidrawImage(blockID: string, callback?: (imageInfo: ExcalidrawImageInfo) => void) {
+  public newExcalidrawImage(protyle: Protyle, callback?: (imageInfo: ExcalidrawImageInfo) => void) {
     const format = this.data[STORAGE_NAME].embedImageFormat;
     const imageName = `excalidraw-image-${window.Lute.NewNodeID()}.${format}`;
     const placeholderImageContent = this.getPlaceholderImageContent(format);
@@ -384,11 +382,7 @@ export default class ExcalidrawPlugin extends Plugin {
     formData.append('isDir', 'false');
     fetchPost('/api/file/putFile', formData, () => {
       const imageURL = `assets/${imageName}`;
-      fetchPost('/api/block/updateBlock', {
-        id: blockID,
-        data: `![](${imageURL})`,
-        dataType: "markdown",
-      });
+      protyle.insert(`![](${imageURL})`);
       const imageInfo: ExcalidrawImageInfo = {
         imageURL: imageURL,
         data: placeholderImageContent,
