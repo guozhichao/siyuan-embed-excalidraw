@@ -27,6 +27,20 @@ const postMessage = (message: any) => {
   window.parent.postMessage(JSON.stringify(message), '*');
 };
 
+const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
+  return (
+    <iframe
+      className="excalidraw__embeddable"
+      src={element.link || ""}
+      referrerPolicy="no-referrer-when-downgrade"
+      title="Excalidraw Embedded Content"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen={true}
+      sandbox={`allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
+    />
+  )
+}
+
 const save = async (eventName: 'save' | 'autosave') => {
   if (!window.excalidrawAPI) return;
   let imageDataURL = '';
@@ -40,6 +54,7 @@ const save = async (eventName: 'save' | 'autosave') => {
         exportBackground: false,
       },
       files: window.excalidrawAPI.getFiles(),
+      renderEmbeddables: true,
     });
     imageDataURL = `data:${currentMimeType};base64,${unicodeToBase64(svg.outerHTML)}`
   } else {
@@ -105,6 +120,7 @@ const App = (props: { initialData: any }) => {
       onLibraryChange={handleLibraryChange}
       excalidrawAPI={setExcalidrawAPI}
       validateEmbeddable={true}
+      renderEmbeddable={renderEmbeddable}
       UIOptions={{
         canvasActions: {
           loadScene: true,

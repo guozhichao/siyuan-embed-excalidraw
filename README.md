@@ -79,6 +79,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.4.6
+    + Feature: Embed Web page support scroll bars
 + v0.4.5
     + Fix: input `/excalidraw` too fast causes create image fail
 + v0.4.4
