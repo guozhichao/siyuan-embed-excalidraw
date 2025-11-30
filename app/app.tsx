@@ -19,6 +19,7 @@ import {
   blobToDataURL,
   dataURLToBlob,
   getImageSizeFromBase64,
+  HTMLToElement,
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
@@ -36,15 +37,51 @@ const postMessage = (message: any) => {
 };
 
 const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
+  let linkURL = element.link as string || '';
+  let onLoad = undefined;
+  if (element.link?.startsWith('siyuan://blocks/')) {
+    const blockID = element.link.split('siyuan://blocks/')[1];
+    linkURL = `/stage/build/desktop/?id=${blockID}&focus=1`;
+
+    onLoad = (event: React.SyntheticEvent<HTMLIFrameElement, Event>) => {
+      const iframe = event.target as HTMLIFrameElement;
+      const styleElement = HTMLToElement(`<style>
+  #toolbar,
+  #status,
+  #message,
+  #dockBottom, #dockLeft, #dockRight,
+  .layout__dockl, .layout__dockr,
+  .layout__wnd--active >:first-child,
+  .protyle-breadcrumb,
+  .protyle-background,
+  .layout__resize--lr, .layout__resize,
+  .layout__center >:not(:first-child),
+  .layout__center >:first-child:not(.layout__wnd--active) >:not(:first-child),
+  .layout__center >:first-child:not(.layout__wnd--active) >:first-child:not(.layout__wnd--active) >:not(:first-child),
+  .protyle-title:not([data-node-id="${blockID}"]) {
+    display: none;
+  }
+  .protyle,
+  .layout-tab-container,
+  #layouts >:first-child,
+  .protyle-content:not(:hover) {
+    overflow: hidden;
+  }
+</style>`);
+      iframe.contentDocument?.head.appendChild(styleElement);
+    };
+  }
+
   return (
     <iframe
       className="excalidraw__embeddable"
-      src={element.link || ""}
+      src={linkURL}
       referrerPolicy="no-referrer-when-downgrade"
       title="Excalidraw Embedded Content"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen={true}
       sandbox={`allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
+      onLoad={onLoad}
     />
   )
 }
@@ -132,7 +169,6 @@ const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | R
     const value = match[2];
 
     const sceneElements = window.excalidrawAPI.getSceneElements();
-    console.log(sceneElements);
     const targets = sceneElements.filter((element: any) => {
       if (linktype === 'element') {
         return element.id === value;
