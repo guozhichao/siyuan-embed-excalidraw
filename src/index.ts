@@ -4,16 +4,15 @@ import {
   getFrontend,
   fetchPost,
   fetchSyncPost,
-  IWebSocketData,
   getAllEditor,
   getAllModels,
   openTab,
   Custom,
+  Protyle,
 } from "siyuan";
 import "@/index.scss";
 import PluginInfoString from '@/../plugin.json';
 import {
-  getImageSizeFromBase64,
   base64ToUnicode,
   unicodeToBase64,
   blobToDataURL,
@@ -275,7 +274,6 @@ export default class ExcalidrawPlugin extends Plugin {
         createActionElement: async () => {
           const snippets = await this.getSnippets();
           const optionsHTML = snippets.map(snippet => {
-            const isSelected = this.data[STORAGE_NAME].snippets.includes(snippet.id);
             return `
 <div class="fn__hr--small"></div>
 <div class="fn__flex">
@@ -401,19 +399,6 @@ export default class ExcalidrawPlugin extends Plugin {
     return await blobToDataURL(blob);
   }
 
-  public updateExcalidrawImage(imageInfo: ExcalidrawImageInfo, callback?: (response: IWebSocketData) => void) {
-    if (!imageInfo.data) {
-      imageInfo.data = this.getPlaceholderImageContent(imageInfo.format);
-    }
-    const blob = dataURLToBlob(imageInfo.data);
-    const file = new File([blob], imageInfo.imageURL.split('/').pop(), { type: blob.type });
-    const formData = new FormData();
-    formData.append("path", 'data/' + imageInfo.imageURL);
-    formData.append("file", file);
-    formData.append("isDir", "false");
-    fetchPost("/api/file/putFile", formData, callback);
-  }
-
   public updateAttrLabel(imageInfo: ExcalidrawImageInfo, blockElement: HTMLElement) {
     if (!imageInfo) return;
 
@@ -528,10 +513,10 @@ export default class ExcalidrawPlugin extends Plugin {
       type: this.EDIT_TAB_TYPE,
       init() {
         const imageInfo: ExcalidrawImageInfo = this.data;
-        const iframeID = unicodeToBase64(`excalidraw-edit-tab-${imageInfo.imageURL}`);
+        const iframeID = encodeURIComponent(unicodeToBase64(`excalidraw-edit-tab-${imageInfo.imageURL}`));
         const editTabHTML = `
 <div class="excalidraw-edit-tab">
-    <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}${that.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}"></iframe>
+    <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}${that.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}"></iframe>
 </div>`;
         this.element.innerHTML = editTabHTML;
 
@@ -543,11 +528,11 @@ export default class ExcalidrawPlugin extends Plugin {
           iframe.contentWindow.postMessage(JSON.stringify(message), '*');
         };
 
+        const keydownEventHandleer = (event: KeyboardEvent) => {
+          that.tabHotKeyEventHandler(event, this);
+        };
         const onInit = (message: any) => {
-          postMessage({
-            action: "load",
-            data: imageInfo.data,
-          });
+          iframe.contentWindow.addEventListener("keydown", keydownEventHandleer);
         }
 
         const onReady = (message: any) => {
@@ -555,18 +540,15 @@ export default class ExcalidrawPlugin extends Plugin {
         }
 
         const onSave = (message: any) => {
-          imageInfo.data = message.data;
-          imageInfo.data = that.fixImageContent(imageInfo.data);
-          that.updateExcalidrawImage(imageInfo, () => {
-            fetch(imageInfo.imageURL, { cache: 'reload' }).then(() => {
-              document.querySelectorAll(`img[data-src='${imageInfo.imageURL}']`).forEach(imageElement => {
-                (imageElement as HTMLImageElement).src = imageInfo.imageURL;
-              });
+          if (message.imageURL === imageInfo.imageURL) {
+            imageInfo.data = message.data;
+          }
+          const imageURL = message.imageURL;
+          fetch(imageURL, { cache: 'reload' }).then(() => {
+            document.querySelectorAll(`img[src='${imageURL}']`).forEach(imageElement => {
+              (imageElement as HTMLImageElement).src = imageURL;
             });
           });
-          if (message.event === "save") {
-            postMessage({ action: 'savedone' });
-          }
         }
 
         const onBrowseLibrary = (message: any) => {
@@ -607,15 +589,9 @@ export default class ExcalidrawPlugin extends Plugin {
           }
         };
 
-        const keydownEventHandleer = (event: KeyboardEvent) => {
-          that.tabHotKeyEventHandler(event, this);
-        };
-
         window.addEventListener("message", messageEventHandler);
-        iframe.contentWindow.addEventListener("keydown", keydownEventHandleer);
         this.beforeDestroy = () => {
           window.removeEventListener("message", messageEventHandler);
-          iframe.contentWindow.removeEventListener("keydown", keydownEventHandleer);
         };
       }
     });
@@ -634,13 +610,13 @@ export default class ExcalidrawPlugin extends Plugin {
   }
 
   public openEditDialog(imageInfo: ExcalidrawImageInfo) {
-    const iframeID = unicodeToBase64(`excalidraw-edit-dialog-${imageInfo.imageURL}`);
+    const iframeID = encodeURIComponent(unicodeToBase64(`excalidraw-edit-dialog-${imageInfo.imageURL}`));
     const editDialogHTML = `
 <div class="excalidraw-edit-dialog">
     <div class="edit-dialog-header resize__move"></div>
     <div class="edit-dialog-container">
         <div class="edit-dialog-editor">
-            <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}&fullscreenBtn=1${this.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}"></iframe>
+            <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}&fullscreenBtn=1${this.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}"></iframe>
         </div>
         <div class="fn__hr--b"></div>
     </div>
@@ -667,30 +643,22 @@ export default class ExcalidrawPlugin extends Plugin {
       iframe.contentWindow.postMessage(JSON.stringify(message), '*');
     };
 
-    const onInit = (message: any) => {
-      postMessage({
-        action: "load",
-        data: imageInfo.data,
-      });
-    }
+    const onInit = (message: any) => {}
 
     const onReady = (message: any) => {
       this.injectSnippetsToIframe(iframe);
     }
 
     const onSave = (message: any) => {
-      imageInfo.data = message.data;
-      imageInfo.data = this.fixImageContent(imageInfo.data);
-      this.updateExcalidrawImage(imageInfo, () => {
-        fetch(imageInfo.imageURL, { cache: 'reload' }).then(() => {
-          document.querySelectorAll(`img[data-src='${imageInfo.imageURL}']`).forEach(imageElement => {
-            (imageElement as HTMLImageElement).src = imageInfo.imageURL;
-          });
+      if (message.imageURL === imageInfo.imageURL) {
+        imageInfo.data = message.data;
+      }
+      const imageURL = message.imageURL;
+      fetch(imageURL, { cache: 'reload' }).then(() => {
+        document.querySelectorAll(`img[src='${imageURL}']`).forEach(imageElement => {
+          (imageElement as HTMLImageElement).src = imageURL;
         });
       });
-      if (message.event === "save") {
-        postMessage({ action: 'savedone' });
-      }
     }
 
     const onBrowseLibrary = (message: any) => {
@@ -794,20 +762,6 @@ export default class ExcalidrawPlugin extends Plugin {
 
   public isDarkMode(): boolean {
     return this.data[STORAGE_NAME].themeMode === 'themeDark' || (this.data[STORAGE_NAME].themeMode === 'themeOS' && window.siyuan.config.appearance.mode === 1);
-  }
-
-  public fixImageContent(imageDataURL: string) {
-    // 当图像为空时，使用默认的占位图
-    const imageSize = getImageSizeFromBase64(imageDataURL);
-    if (imageSize && imageSize.width <= 20 && imageSize.height <= 20) {
-      if (imageDataURL.startsWith('data:image/svg+xml;base64,')) {
-        imageDataURL = this.getPlaceholderImageContent('svg');
-      }
-      if (imageDataURL.startsWith('data:image/png;base64,')) {
-        imageDataURL = this.getPlaceholderImageContent('png');
-      }
-    }
-    return imageDataURL;
   }
 
   private async getSnippets(snippetIDs?: string[]): Promise<ISnippet[]> {

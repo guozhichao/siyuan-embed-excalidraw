@@ -14,17 +14,25 @@ import {
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import './app.scss';
-import { blobToDataURL, dataURLToBlob, mimeTypeOfDataURL, unicodeToBase64 } from '../src/utils';
+import {
+  unicodeToBase64,
+  blobToDataURL,
+  dataURLToBlob,
+  getImageSizeFromBase64,
+} from '../src/utils';
+import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
+import defaultImageContent from "../src/default.json";
 
 window.EXCALIDRAW_ASSET_PATH = '/plugins/siyuan-embed-excalidraw/app/';
 window.EXCALIDRAW_LIBRARY_PATH = '/data/storage/petal/siyuan-embed-excalidraw/library.excalidrawlib';
 const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
-let currentMimeType = 'image/svg+xml';
+let mimeType = 'image/svg+xml';
+let imageURL = '';
 
 const postMessage = (message: any) => {
-  window.parent.postMessage(JSON.stringify(message), '*');
+  window.parent?.postMessage(JSON.stringify(message), '*');
 };
 
 const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
@@ -41,10 +49,33 @@ const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null
   )
 }
 
+const fixImageContent = (imageDataURL: string): string => {
+  // 当图像为空时，使用默认的占位图
+  const imageSize = getImageSizeFromBase64(imageDataURL);
+  if (imageSize && imageSize.width <= 20 && imageSize.height <= 20) {
+    if (imageDataURL.startsWith('data:image/svg+xml;base64,')) {
+      imageDataURL = defaultImageContent['svg'];
+    }
+    if (imageDataURL.startsWith('data:image/png;base64,')) {
+      imageDataURL = defaultImageContent['png'];
+    }
+  }
+  return imageDataURL;
+}
+
+const saveDone = () => {
+  if (!window.excalidrawAPI) return;
+  window.excalidrawAPI.setToast({
+    message: langCode.startsWith('zh') ? '保存成功' : 'Saved',
+    closable: false,
+    duration: 1000,
+  });
+}
+
 const save = async (eventName: 'save' | 'autosave') => {
   if (!window.excalidrawAPI) return;
   let imageDataURL = '';
-  if (currentMimeType === 'image/svg+xml') {
+  if (mimeType === 'image/svg+xml') {
     const svg = await exportToSvg({
       elements: window.excalidrawAPI.getSceneElements(),
       appState: {
@@ -56,7 +87,7 @@ const save = async (eventName: 'save' | 'autosave') => {
       files: window.excalidrawAPI.getFiles(),
       renderEmbeddables: true,
     });
-    imageDataURL = `data:${currentMimeType};base64,${unicodeToBase64(svg.outerHTML)}`
+    imageDataURL = `data:${mimeType};base64,${unicodeToBase64(svg.outerHTML)}`
   } else {
     const blob = await exportToBlob({
       elements: window.excalidrawAPI.getSceneElements(),
@@ -67,14 +98,57 @@ const save = async (eventName: 'save' | 'autosave') => {
         exportBackground: false,
       },
       files: window.excalidrawAPI.getFiles(),
-      mimeType: currentMimeType,
+      mimeType: mimeType,
     });
     imageDataURL = await blobToDataURL(blob);
   }
-  postMessage({
-    event: eventName,
-    data: imageDataURL,
+  imageDataURL = fixImageContent(imageDataURL);
+
+  const blob = dataURLToBlob(imageDataURL);
+  const file = new File([blob], imageURL.split('/').pop()!, { type: blob.type });
+  const formData = new FormData();
+  formData.append("path", 'data/' + imageURL);
+  formData.append("file", file);
+  formData.append("isDir", "false");
+  fetchPost("/api/file/putFile", formData, () => {
+    postMessage({
+      event: eventName,
+      imageURL: imageURL,
+      data: imageDataURL,
+    });
   });
+
+  if (eventName === 'save') saveDone();
+}
+
+const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement>; }>) => {
+  event.preventDefault();
+
+  if (!element.link) return;
+
+  const match = element.link.match(/^(element|group)=([^&?#\s]+)$/i);
+  if (match) {
+    const linktype = match[1].toLowerCase() as 'element' | 'group';
+    const value = match[2];
+
+    const sceneElements = window.excalidrawAPI.getSceneElements();
+    console.log(sceneElements);
+    const targets = sceneElements.filter((element: any) => {
+      if (linktype === 'element') {
+        return element.id === value;
+      } else {
+        return element.groupIds?.includes(value);
+      }
+    });
+    if (targets.length > 0) {
+      window.excalidrawAPI.scrollToContent(targets, {
+        animate: true,
+      });
+    }
+  }
+  else {
+    window.open(element.link, '_blank');
+  }
 }
 
 const App = (props: { initialData: any }) => {
@@ -121,6 +195,8 @@ const App = (props: { initialData: any }) => {
       excalidrawAPI={setExcalidrawAPI}
       validateEmbeddable={true}
       renderEmbeddable={renderEmbeddable}
+      generateLinkForSelection={(id: string, type: "element" | "group") => { return `${type}=${id}`; }}
+      onLinkOpen={openLink}
       UIOptions={{
         canvasActions: {
           loadScene: true,
@@ -162,9 +238,16 @@ const App = (props: { initialData: any }) => {
   );
 };
 
-const onLoad = async (message: any) => {
-  currentMimeType = mimeTypeOfDataURL(message.data);
-  const blob = dataURLToBlob(message.data);
+const load = async () => {
+  imageURL = urlParams.get('imageURL') || '';
+  if (!imageURL) return;
+
+  const response = await fetch(`/${imageURL}`, { cache: 'reload' });
+  if (!response.ok) return;
+
+  const blob = await response.blob();
+  mimeType = blob.type;
+
   const contents = await loadFromBlob(blob, null, null);
   contents.appState.theme = urlParams.get('dark') == '1' ? 'dark' : 'light';
   createRoot(document.getElementById('root')!).render(React.createElement(App, {
@@ -178,26 +261,11 @@ const onLoad = async (message: any) => {
   }));
 };
 
-const onSaveDone = (message: any) => {
-  if (!window.excalidrawAPI) return;
-  window.excalidrawAPI.setToast({
-    message: langCode.startsWith('zh') ? '保存成功' : 'Saved',
-    closable: false,
-    duration: 1000,
-  });
-}
-
 const messageHandler = (event: MessageEvent) => {
   if (event.data && event.data.length > 0) {
     try {
       var message = JSON.parse(event.data);
       if (message != null) {
-        if (message.action == "load") {
-          onLoad(message);
-        }
-        else if (message.action == "savedone") {
-          onSaveDone(message);
-        }
       }
     }
     catch (err) {
@@ -282,6 +350,7 @@ if (libraryUrlTokens) {
   addLibrary(libraryUrlTokens);
 } else {
   window.addEventListener('message', messageHandler);
+  load();
   postMessage({ event: 'init' });
   setupMutationObserver();
 }
