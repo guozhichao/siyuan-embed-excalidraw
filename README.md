@@ -34,9 +34,9 @@ This plugin serves as the fourth plugin in the **Embed Series**, aiming to provi
 - [x] Light/Dark mode
 - [x] Edit in Tab/Dialog
 - [x] Custom Snippets
-- [ ] Support SiYuan block in Excalidraw
+- [x] Support SiYuan block in Excalidraw
 
-> If you have additional feature requests or suggestions, feel free to [open an issue on GitHub](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues) or [post in the SiYuan community](https://ld246.com/article/1763408501738) to request support for additional packages.
+> If you have additional feature requests or suggestions, feel free to [open an issue on GitHub](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues) or [post in the SiYuan community](https://ld246.com/article/1763408501738) to request support for additional features.
 
 ## Effects on PC
 
@@ -67,6 +67,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 **Excalidraw Snippets:** Create CSS/JS code snippets (do not enable) in the code snippet editor in SiYuan, then select the code snippet enabled in Excalidraw in the plugin settings to implement custom functionality and styles. You can also find code snippets in the [Excalidraw Code Snippet Marketplace](https://ld246.com/article/1764004088153).
 
+**Embedding SiYuan Content:** Click the button on the left side of the SiYuan document/block, click `Copy - Copy block hyperlink`, and get a link starting with `siyuan://blocks/`. In Excalidraw, click `Embed Web Page`, paste the link, and the SiYuan content will be embedded in Excalidraw.
+
 **Migrating from other sources:**
 
 + Method 1: Simply export your diagram as an SVG/PNG from any Excalidraw platform with the "Embed scene" option enabled, then drag the resulting SVG/PNG file into SiYuan.
@@ -79,6 +81,10 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.5.0
+    + Feature: Embed Web page support SiYuan hyperlinks (embedding SiYuan blocks)
+    + Feature: Link object support SiYuan hyperlinks
+    + Fix: Failed to jump to normal web page
 + v0.4.6
     + Feature: Embed Web page support scroll bars
 + v0.4.5
