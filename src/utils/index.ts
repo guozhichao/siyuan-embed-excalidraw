@@ -273,3 +273,273 @@ export function getImageSizeFromBase64(dataUrl: string): { width: number, height
   }
   return null;
 }
+
+export function base64ToArray(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function arrayToBase64(array: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < array.length; i++) {
+    binary += String.fromCharCode(array[i]);
+  }
+  return btoa(binary);
+}
+
+export function locatePNGtEXt(data: Uint8Array): { index: number; length: number } | null {
+  if (data.length < 8) return null;
+
+  // 检查 PNG 文件头（可选，但推荐）
+  const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (let i = 0; i < 8; i++) {
+    if (data[i] !== pngSignature[i]) {
+      return null; // 不是合法 PNG
+    }
+  }
+
+  let offset = 8; // 跳过签名
+
+  while (offset <= data.length - 12) {
+    // 读取 Length（大端序，4字节）
+    const length = (
+      (data[offset] << 24) |
+      (data[offset + 1] << 16) |
+      (data[offset + 2] << 8) |
+      data[offset + 3]
+    ) >>> 0;
+
+    // 检查是否超出文件边界
+    if (offset + 12 + length > data.length) {
+      break; // chunk 不完整
+    }
+
+    // 读取 Chunk Type（4字节）
+    const typeBytes = data.subarray(offset + 4, offset + 8);
+    const typeStr = String.fromCharCode(...typeBytes);
+
+    if (typeStr === 'tEXt') {
+      // 找到 tEXt chunk
+      return { index: offset, length: 12 + length };
+    }
+
+    // 跳到下一个 chunk（12 = 4 Length + 4 Type + 4 CRC）
+    offset += 12 + length;
+  }
+
+  return null; // 未找到 tEXt
+}
+
+export function replaceSubArray(
+  srcArray: Uint8Array,
+  srcSubArrayLocation: { index: number; length: number },
+  destArray: Uint8Array,
+  destSubArrayLocation: { index: number; length: number }
+): Uint8Array {
+  const { index: srcIndex, length: srcLength } = srcSubArrayLocation;
+  const { index: destIndex, length: destLength } = destSubArrayLocation;
+
+  // 边界检查：确保源子数组有效
+  if (srcIndex < 0 || srcLength < 0 || srcIndex + srcLength > srcArray.length) {
+    throw new Error('Invalid srcSubArrayLocation: out of bounds');
+  }
+
+  // 边界检查：确保目标子数组有效
+  if (destIndex < 0 || destLength < 0 || destIndex + destLength > destArray.length) {
+    throw new Error('Invalid destSubArrayLocation: out of bounds');
+  }
+
+  // 提取源子数组
+  const srcSubArray = srcArray.subarray(srcIndex, srcIndex + srcLength);
+
+  // 计算新数组长度
+  const newLength = destArray.length - destLength + srcSubArray.length;
+
+  // 创建结果数组
+  const result = new Uint8Array(newLength);
+
+  // 1. 复制 destArray 的前半部分 [0, destIndex)
+  result.set(destArray.subarray(0, destIndex), 0);
+
+  // 2. 插入 srcSubArray
+  result.set(srcSubArray, destIndex);
+
+  // 3. 复制 destArray 的后半部分 [destIndex + destLength, end)
+  const afterDestIndex = destIndex + destLength;
+  const afterSrcIndex = destIndex + srcSubArray.length;
+  result.set(destArray.subarray(afterDestIndex), afterSrcIndex);
+
+  return result;
+}
+
+export function insertPNGpHYs(data: Uint8Array, dpi: number): Uint8Array {
+  if (data.length < 8) throw new Error('Invalid PNG: too short');
+
+  // 验证 PNG 签名
+  const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (let i = 0; i < 8; i++) {
+    if (data[i] !== pngSignature[i]) {
+      throw new Error('Not a valid PNG file');
+    }
+  }
+
+  let offset = 8; // 跳过签名
+
+  // Step 1: 找到 IHDR 块并定位其结束位置
+  let ihdrEnd = -1;
+  while (offset <= data.length - 12) {
+    const length = (
+      (data[offset] << 24) |
+      (data[offset + 1] << 16) |
+      (data[offset + 2] << 8) |
+      data[offset + 3]
+    ) >>> 0;
+
+    if (offset + 12 + length > data.length) break;
+
+    const typeBytes = data.subarray(offset + 4, offset + 8);
+    const typeStr = String.fromCharCode(...typeBytes);
+
+    if (typeStr === 'IHDR') {
+      ihdrEnd = offset + 12 + length; // IHDR 结束位置（下一个 chunk 开始处）
+      break;
+    }
+
+    offset += 12 + length;
+  }
+
+  if (ihdrEnd === -1) {
+    throw new Error('IHDR chunk not found');
+  }
+
+  // Step 2: 构造 pHYs chunk data
+  const ppm = Math.round(dpi * 39.3701); // pixels per meter
+  const physData = new Uint8Array(9);
+  // ppm_x (4 bytes, big-endian)
+  physData[0] = (ppm >> 24) & 0xff;
+  physData[1] = (ppm >> 16) & 0xff;
+  physData[2] = (ppm >> 8) & 0xff;
+  physData[3] = ppm & 0xff;
+  // ppm_y (same as x)
+  physData[4] = physData[0];
+  physData[5] = physData[1];
+  physData[6] = physData[2];
+  physData[7] = physData[3];
+  // unit = 1 (meter)
+  physData[8] = 1;
+
+  // Chunk type "pHYs"
+  const physType = new Uint8Array([0x70, 0x48, 0x59, 0x73]); // 'pHYs'
+
+  // Step 3: 计算 CRC32 over "pHYs" + physData
+  const crcBuffer = new Uint8Array(physType.length + physData.length);
+  crcBuffer.set(physType, 0);
+  crcBuffer.set(physData, physType.length);
+  const crc = crc32(crcBuffer);
+
+  // Step 4: 构造完整的 pHYs chunk
+  const chunkLength = new Uint8Array(4);
+  chunkLength[0] = (physData.length >> 24) & 0xff;
+  chunkLength[1] = (physData.length >> 16) & 0xff;
+  chunkLength[2] = (physData.length >> 8) & 0xff;
+  chunkLength[3] = physData.length & 0xff;
+
+  const crcBytes = new Uint8Array(4);
+  crcBytes[0] = (crc >> 24) & 0xff;
+  crcBytes[1] = (crc >> 16) & 0xff;
+  crcBytes[2] = (crc >> 8) & 0xff;
+  crcBytes[3] = crc & 0xff;
+
+  const physChunk = new Uint8Array(4 + 4 + physData.length + 4);
+  physChunk.set(chunkLength, 0);
+  physChunk.set(physType, 4);
+  physChunk.set(physData, 8);
+  physChunk.set(crcBytes, 8 + physData.length);
+
+  // Step 5: 插入到 IHDR 之后
+  const result = new Uint8Array(data.length + physChunk.length);
+  // [0, ihdrEnd)
+  result.set(data.subarray(0, ihdrEnd), 0);
+  // insert pHYs chunk
+  result.set(physChunk, ihdrEnd);
+  // [ihdrEnd, end)
+  result.set(data.subarray(ihdrEnd), ihdrEnd + physChunk.length);
+
+  return result;
+}
+
+// --- CRC32 工具函数（PNG 标准）---
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[i] = c;
+  }
+  return table;
+})();
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) {
+    crc = CRC_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+export function insertPNGtEXt(data: Uint8Array, tEXt: Uint8Array): Uint8Array {
+  if (data.length < 8) throw new Error('Invalid PNG: too short');
+
+  // 验证 PNG 签名
+  const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (let i = 0; i < 8; i++) {
+    if (data[i] !== pngSignature[i]) {
+      throw new Error('Not a valid PNG file');
+    }
+  }
+
+  let offset = 8; // 跳过 PNG 签名
+
+  // 查找第一个 IDAT chunk 的起始偏移
+  let idatOffset = -1;
+  while (offset <= data.length - 12) {
+    const length = (
+      (data[offset] << 24) |
+      (data[offset + 1] << 16) |
+      (data[offset + 2] << 8) |
+      data[offset + 3]
+    ) >>> 0;
+
+    if (offset + 12 + length > data.length) {
+      break; // 不完整 chunk，提前终止
+    }
+
+    const typeBytes = data.subarray(offset + 4, offset + 8);
+    const typeStr = String.fromCharCode(...typeBytes);
+
+    if (typeStr === 'IDAT') {
+      idatOffset = offset;
+      break;
+    }
+
+    offset += 12 + length;
+  }
+
+  if (idatOffset === -1) {
+    throw new Error('No IDAT chunk found in PNG');
+  }
+
+  // 构建新数据：[header...][tEXt][IDAT...]
+  const result = new Uint8Array(data.length + tEXt.length);
+  result.set(data.subarray(0, idatOffset), 0);               // IDAT 之前的部分
+  result.set(tEXt, idatOffset);                              // 插入完整 tEXt chunk
+  result.set(data.subarray(idatOffset), idatOffset + tEXt.length); // 原 IDAT 及之后部分
+
+  return result;
+}

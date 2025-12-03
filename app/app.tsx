@@ -11,22 +11,30 @@ import {
   mergeLibraryItems,
   serializeLibraryAsJSON,
   MainMenu,
+  getCommonBounds,
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
-import html2canvas from 'html2canvas';
 import './app.scss';
 import {
   unicodeToBase64,
+  base64ToUnicode,
   blobToDataURL,
   dataURLToBlob,
   getImageSizeFromBase64,
-  HTMLToElement,
-  base64ToUnicode,
-  addStyle
+  addStyle,
+  base64ToArray,
+  arrayToBase64,
+  locatePNGtEXt,
+  insertPNGtEXt,
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
 import defaultImageContent from "../src/default.json";
+import {
+  createCanvasFromDataURL,
+  createCanvasFromIframe,
+  drawCanvasOnCanvas,
+} from './utils';
 
 addStyle("/stage/protyle/js/katex/katex.min.css", "protyleKatexStyle");
 
@@ -36,6 +44,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
 let mimeType = 'image/svg+xml';
 let imageURL = '';
+const exportPadding = 10;
 
 const postMessage = (message: any) => {
   window.parent?.postMessage(JSON.stringify(message), '*');
@@ -61,43 +70,6 @@ const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null
       sandbox={`allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
     />
   )
-}
-function addRoundedCornersToCanvas(sourceCanvas: HTMLCanvasElement, radius: number): HTMLCanvasElement {
-  const sourceCtx = sourceCanvas.getContext('2d');
-  if (!sourceCtx) return sourceCanvas; // 确保获取到 2D 绘图上下文
-
-  const targetCanvas = document.createElement('canvas');
-  const targetCtx = targetCanvas.getContext('2d');
-  if (!targetCtx) return sourceCanvas;
-
-  // 设置目标 canvas 尺寸与源 canvas 相同
-  targetCanvas.width = sourceCanvas.width;
-  targetCanvas.height = sourceCanvas.height;
-
-  // 首先将源 canvas 绘制到目标 canvas 上
-  targetCtx.drawImage(sourceCanvas, 0, 0);
-
-  // 改变 globalCompositeOperation 属性
-  targetCtx.globalCompositeOperation = 'destination-in';
-
-  // 在目标 canvas 上绘制圆角矩形路径
-  targetCtx.beginPath();
-  targetCtx.moveTo(radius, 0);
-  targetCtx.lineTo(targetCanvas.width - radius, 0);
-  targetCtx.quadraticCurveTo(targetCanvas.width, 0, targetCanvas.width, radius);
-  targetCtx.lineTo(targetCanvas.width, targetCanvas.height - radius);
-  targetCtx.quadraticCurveTo(targetCanvas.width, targetCanvas.height, targetCanvas.width - radius, targetCanvas.height);
-  targetCtx.lineTo(radius, targetCanvas.height);
-  targetCtx.quadraticCurveTo(0, targetCanvas.height, 0, targetCanvas.height - radius);
-  targetCtx.lineTo(0, radius);
-  targetCtx.quadraticCurveTo(0, 0, radius, 0);
-  targetCtx.closePath();
-
-  // 填充路径，只有圆角内的图像会被保留下来
-  targetCtx.fill();
-
-  // 返回带有圆角的目标 canvas 或者使用 toDataURL() 导出为图片
-  return targetCanvas;
 }
 
 const fixImageContent = async (imageDataURL: string): Promise<string> => {
@@ -131,52 +103,22 @@ const fixImageContent = async (imageDataURL: string): Promise<string> => {
       if (iframe.parentElement?.parentElement?.tagName?.toLowerCase() === 'foreignobject') {
         const foreignObject = iframe.parentElement.parentElement;
         const originIframe = document.querySelector(`.excalidraw__embeddable-container__inner iframe[src="${embedLink}"]`) as HTMLIFrameElement;
-        if (originIframe) {
-          let iframeBody;
-          let iframeScrollX;
-          let iframeScrollY;
-          if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
-            const coreIframe = originIframe.contentDocument?.querySelector('#root iframe') as HTMLIFrameElement;
-            if (coreIframe) {
-              iframeBody = coreIframe.contentDocument?.body;
-              iframeScrollX = coreIframe.contentDocument?.documentElement.scrollLeft;
-              iframeScrollY = coreIframe.contentDocument?.documentElement.scrollTop;
-            }
-          }
-          else {
-            iframeBody = originIframe.contentDocument?.body;
-            iframeScrollX = originIframe.contentDocument?.documentElement.scrollLeft;
-            iframeScrollY = originIframe.contentDocument?.documentElement.scrollTop;
-          }
-          if (!iframeBody) continue;
+        if (!originIframe) continue;
 
-          const scale = 1.2;
-          const padding = 1;
-          let iframeCanvas = await html2canvas(iframeBody, {
-            allowTaint: true,
-            useCORS: true,
-            logging: false,
-            width: parseInt(foreignObject.style.width) || undefined,
-            height: parseInt(foreignObject.style.height) || undefined,
-            x: iframeScrollX,
-            y: iframeScrollY,
-            scale: scale,
-          });
-          const raidus = parseInt(iframe.style.borderRadius || '');
-          if (raidus) {
-            iframeCanvas = addRoundedCornersToCanvas(iframeCanvas, scale * raidus);
-          }
+        const scale = 1.2;
+        const padding = 1;
+        let iframeCanvas = await createCanvasFromIframe(originIframe, scale, padding);
+        if (!iframeCanvas) continue;
 
-          const iframeDataURL = iframeCanvas.toDataURL();
-          const background = document.createElementNS('http://www.w3.org/2000/svg', 'image') as SVGImageElement;
-          background.setAttribute('href', iframeDataURL);
-          background.style = `width: ${parseInt(foreignObject.style.width) - 2 * padding}px; height: ${parseInt(foreignObject.style.height) - 2 * padding}px;`;
-          background.setAttribute('transform', `translate(${padding} ${padding})`);
-          foreignObject.insertAdjacentElement('beforebegin', background);
+        const iframeDataURL = iframeCanvas.toDataURL();
+        const background = document.createElementNS('http://www.w3.org/2000/svg', 'image') as SVGImageElement;
+        background.setAttribute('href', iframeDataURL);
+        background.style = `width: ${parseInt(foreignObject.style.width) - 2 * padding}px; height: ${parseInt(foreignObject.style.height) - 2 * padding}px;`;
+        background.setAttribute('transform', `translate(${padding} ${padding})`);
+        foreignObject.insertAdjacentElement('beforebegin', background);
 
-          if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
-            foreignObject.remove();
-          }
+        if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
+          foreignObject.remove();
         }
       }
     }
@@ -185,7 +127,39 @@ const fixImageContent = async (imageDataURL: string): Promise<string> => {
     imageDataURL = `data:image/svg+xml;base64,${base64String}`;
   }
   if (imageDataURL.startsWith('data:image/png;base64,')) {
+    const allElements = window.excalidrawAPI.getSceneElements() as any[];
+    const embeddableElements = allElements.filter(element => element.type === 'embeddable');
+    if (embeddableElements.length > 0) {
+      let canvas = await createCanvasFromDataURL(imageDataURL);
+      const [minX, minY, maxX, maxY] = getCommonBounds(allElements);
+      const originX = minX - exportPadding;
+      const originY = minY - exportPadding;
 
+      for (const embeddableElement of embeddableElements) {
+        const link = embeddableElement.link || '';
+        const embedLink = getEmbeddableLink(link);
+        if (!embedLink) continue;
+        if (embedLink.startsWith('http')) continue; // 不处理跨域iframe，因为html2canvas不支持
+        const originIframe = document.querySelector(`.excalidraw__embeddable-container__inner iframe[src="${embedLink}"]`) as HTMLIFrameElement;
+        if (!originIframe) continue;
+
+        const scale = 1;
+        const padding = 1;
+        let iframeCanvas = await createCanvasFromIframe(originIframe, scale, padding);
+        if (!iframeCanvas) continue;
+
+        drawCanvasOnCanvas(canvas, iframeCanvas, embeddableElement.x - originX + padding, embeddableElement.y - originY + padding, embeddableElement.angle);
+      }
+      let binaryArray = base64ToArray(imageDataURL.split(',').pop() as string);
+      const location = locatePNGtEXt(binaryArray);
+      if (location) {
+        const metadataArray = binaryArray.subarray(location.index, location.index + location.length);
+        binaryArray = base64ToArray(canvas.toDataURL().split(',').pop() as string);
+        binaryArray = insertPNGtEXt(binaryArray, metadataArray);
+        const base64String = arrayToBase64(binaryArray);
+        imageDataURL = `data:image/png;base64,${base64String}`;
+      }
+    }
   }
   return imageDataURL;
 }
@@ -236,6 +210,7 @@ const save = async (eventName: 'save' | 'autosave') => {
       },
       files: window.excalidrawAPI.getFiles(),
       mimeType: mimeType,
+      exportPadding: exportPadding,
     });
     imageDataURL = await blobToDataURL(blob);
   }
