@@ -13,6 +13,7 @@ import {
   MainMenu,
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
+import html2canvas from 'html2canvas';
 import './app.scss';
 import {
   unicodeToBase64,
@@ -20,10 +21,14 @@ import {
   dataURLToBlob,
   getImageSizeFromBase64,
   HTMLToElement,
+  base64ToUnicode,
+  addStyle
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
 import defaultImageContent from "../src/default.json";
+
+addStyle("/stage/protyle/js/katex/katex.min.css", "protyleKatexStyle");
 
 window.EXCALIDRAW_ASSET_PATH = '/plugins/siyuan-embed-excalidraw/app/';
 window.EXCALIDRAW_LIBRARY_PATH = '/data/storage/petal/siyuan-embed-excalidraw/library.excalidrawlib';
@@ -36,58 +41,66 @@ const postMessage = (message: any) => {
   window.parent?.postMessage(JSON.stringify(message), '*');
 };
 
+const getEmbeddableLink = (link: string): string => {
+  if (link?.startsWith('siyuan://blocks/')) {
+    const blockID = link.split('siyuan://blocks/')[1];
+    link = `/plugins/siyuan-embed-excalidraw/embed/siyuan?id=${blockID}`;
+  }
+  return link;
+}
+
 const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
-  let linkURL = element.link as string || '';
-  let onLoad = undefined;
-  if (element.link?.startsWith('siyuan://blocks/')) {
-    const blockID = element.link.split('siyuan://blocks/')[1];
-    linkURL = `/stage/build/desktop/?id=${blockID}&focus=1`;
-
-    onLoad = (event: React.SyntheticEvent<HTMLIFrameElement, Event>) => {
-      const iframe = event.target as HTMLIFrameElement;
-      const styleElement = HTMLToElement(`<style>
-  #toolbar,
-  #status,
-  #message,
-  #dockBottom, #dockLeft, #dockRight,
-  .layout__dockl, .layout__dockr,
-  .layout__wnd--active >:first-child,
-  .protyle-breadcrumb,
-  .protyle-top >:not(.protyle-title),
-  .protyle-content >:not(.protyle-top):not(.protyle-wysiwyg),
-  .layout__resize--lr, .layout__resize,
-  .layout__center >:not(:first-child),
-  .layout__center >:first-child:not(.layout__wnd--active) >:not(:first-child),
-  .layout__center >:first-child:not(.layout__wnd--active) >:first-child:not(.layout__wnd--active) >:not(:first-child),
-  .protyle-title:not([data-node-id="${blockID}"]) {
-    display: none;
-  }
-  .protyle,
-  .layout-tab-container,
-  #layouts >:first-child,
-  .protyle-content:not(:hover) {
-    overflow: hidden;
-  }
-</style>`);
-      iframe.contentDocument?.head.appendChild(styleElement);
-    };
-  }
-
   return (
     <iframe
       className="excalidraw__embeddable"
-      src={linkURL}
+      src={getEmbeddableLink(element.link || '')}
       referrerPolicy="no-referrer-when-downgrade"
       title="Excalidraw Embedded Content"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen={true}
       sandbox={`allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
-      onLoad={onLoad}
     />
   )
 }
+function addRoundedCornersToCanvas(sourceCanvas: HTMLCanvasElement, radius: number): HTMLCanvasElement {
+  const sourceCtx = sourceCanvas.getContext('2d');
+  if (!sourceCtx) return sourceCanvas; // 确保获取到 2D 绘图上下文
 
-const fixImageContent = (imageDataURL: string): string => {
+  const targetCanvas = document.createElement('canvas');
+  const targetCtx = targetCanvas.getContext('2d');
+  if (!targetCtx) return sourceCanvas;
+
+  // 设置目标 canvas 尺寸与源 canvas 相同
+  targetCanvas.width = sourceCanvas.width;
+  targetCanvas.height = sourceCanvas.height;
+
+  // 首先将源 canvas 绘制到目标 canvas 上
+  targetCtx.drawImage(sourceCanvas, 0, 0);
+
+  // 改变 globalCompositeOperation 属性
+  targetCtx.globalCompositeOperation = 'destination-in';
+
+  // 在目标 canvas 上绘制圆角矩形路径
+  targetCtx.beginPath();
+  targetCtx.moveTo(radius, 0);
+  targetCtx.lineTo(targetCanvas.width - radius, 0);
+  targetCtx.quadraticCurveTo(targetCanvas.width, 0, targetCanvas.width, radius);
+  targetCtx.lineTo(targetCanvas.width, targetCanvas.height - radius);
+  targetCtx.quadraticCurveTo(targetCanvas.width, targetCanvas.height, targetCanvas.width - radius, targetCanvas.height);
+  targetCtx.lineTo(radius, targetCanvas.height);
+  targetCtx.quadraticCurveTo(0, targetCanvas.height, 0, targetCanvas.height - radius);
+  targetCtx.lineTo(0, radius);
+  targetCtx.quadraticCurveTo(0, 0, radius, 0);
+  targetCtx.closePath();
+
+  // 填充路径，只有圆角内的图像会被保留下来
+  targetCtx.fill();
+
+  // 返回带有圆角的目标 canvas 或者使用 toDataURL() 导出为图片
+  return targetCanvas;
+}
+
+const fixImageContent = async (imageDataURL: string): Promise<string> => {
   // 当图像为空时，使用默认的占位图
   const imageSize = getImageSizeFromBase64(imageDataURL);
   if (imageSize && imageSize.width <= 20 && imageSize.height <= 20) {
@@ -97,14 +110,96 @@ const fixImageContent = (imageDataURL: string): string => {
     if (imageDataURL.startsWith('data:image/png;base64,')) {
       imageDataURL = defaultImageContent['png'];
     }
+    return imageDataURL;
+  }
+
+  // Iframe默认图
+  if (imageDataURL.startsWith('data:image/svg+xml;base64,')) {
+    let base64String = imageDataURL.split(',').pop() as string;
+    let xmlStr = base64ToUnicode(base64String);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlStr, 'image/svg+xml');
+    const svg = doc.documentElement as HTMLElement;
+    for (const iframe of Array.from(svg.querySelectorAll('iframe'))) {
+      const link = iframe.getAttribute('src') || '';
+      const embedLink = getEmbeddableLink(link);
+      if (embedLink !== link) {
+        iframe.setAttribute('src', embedLink);
+      }
+      if (!embedLink) continue;
+      if (embedLink.startsWith('http')) continue; // 不处理跨域iframe，因为html2canvas不支持
+      if (iframe.parentElement?.parentElement?.tagName?.toLowerCase() === 'foreignobject') {
+        const foreignObject = iframe.parentElement.parentElement;
+        const originIframe = document.querySelector(`.excalidraw__embeddable-container__inner iframe[src="${embedLink}"]`) as HTMLIFrameElement;
+        if (originIframe) {
+          let iframeBody;
+          let iframeScrollX;
+          let iframeScrollY;
+          if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
+            const coreIframe = originIframe.contentDocument?.querySelector('#root iframe') as HTMLIFrameElement;
+            if (coreIframe) {
+              iframeBody = coreIframe.contentDocument?.body;
+              iframeScrollX = coreIframe.contentDocument?.documentElement.scrollLeft;
+              iframeScrollY = coreIframe.contentDocument?.documentElement.scrollTop;
+            }
+          }
+          else {
+            iframeBody = originIframe.contentDocument?.body;
+            iframeScrollX = originIframe.contentDocument?.documentElement.scrollLeft;
+            iframeScrollY = originIframe.contentDocument?.documentElement.scrollTop;
+          }
+          if (!iframeBody) continue;
+
+          const scale = 1.2;
+          const padding = 1;
+          let iframeCanvas = await html2canvas(iframeBody, {
+            allowTaint: true,
+            useCORS: true,
+            logging: false,
+            width: parseInt(foreignObject.style.width) || undefined,
+            height: parseInt(foreignObject.style.height) || undefined,
+            x: iframeScrollX,
+            y: iframeScrollY,
+            scale: scale,
+          });
+          const raidus = parseInt(iframe.style.borderRadius || '');
+          if (raidus) {
+            iframeCanvas = addRoundedCornersToCanvas(iframeCanvas, scale * raidus);
+          }
+
+          const iframeDataURL = iframeCanvas.toDataURL();
+          const background = document.createElementNS('http://www.w3.org/2000/svg', 'image') as SVGImageElement;
+          background.setAttribute('href', iframeDataURL);
+          background.style = `width: ${parseInt(foreignObject.style.width) - 2 * padding}px; height: ${parseInt(foreignObject.style.height) - 2 * padding}px;`;
+          background.setAttribute('transform', `translate(${padding} ${padding})`);
+          foreignObject.insertAdjacentElement('beforebegin', background);
+
+          if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
+            foreignObject.remove();
+          }
+        }
+      }
+    }
+    xmlStr = svg.outerHTML;
+    base64String = unicodeToBase64(xmlStr);
+    imageDataURL = `data:image/svg+xml;base64,${base64String}`;
+  }
+  if (imageDataURL.startsWith('data:image/png;base64,')) {
+
   }
   return imageDataURL;
 }
 
-const saveDone = () => {
+const triggleToast = (messageType: 'saving' | 'savedone') => {
   if (!window.excalidrawAPI) return;
+  let message = '';
+  if (messageType == 'savedone') {
+    message = langCode.startsWith('zh') ? '保存成功' : 'Saved';
+  } else {
+    message = langCode.startsWith('zh') ? '保存中...' : 'Saving...';
+  }
   window.excalidrawAPI.setToast({
-    message: langCode.startsWith('zh') ? '保存成功' : 'Saved',
+    message: message,
     closable: false,
     duration: 1000,
   });
@@ -112,6 +207,10 @@ const saveDone = () => {
 
 const save = async (eventName: 'save' | 'autosave') => {
   if (!window.excalidrawAPI) return;
+  if (!document.hasFocus()) return; // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
+
+  if (eventName === 'save') triggleToast('saving');
+
   let imageDataURL = '';
   if (mimeType === 'image/svg+xml') {
     const svg = await exportToSvg({
@@ -140,7 +239,9 @@ const save = async (eventName: 'save' | 'autosave') => {
     });
     imageDataURL = await blobToDataURL(blob);
   }
-  imageDataURL = fixImageContent(imageDataURL);
+  imageDataURL = await fixImageContent(imageDataURL);
+
+  if (!document.hasFocus()) return; // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
 
   const blob = dataURLToBlob(imageDataURL);
   const file = new File([blob], imageURL.split('/').pop()!, { type: blob.type });
@@ -156,7 +257,7 @@ const save = async (eventName: 'save' | 'autosave') => {
     });
   });
 
-  if (eventName === 'save') saveDone();
+  if (eventName === 'save') triggleToast('savedone');
 }
 
 const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement>; }>) => {

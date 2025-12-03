@@ -10,17 +10,20 @@
   "scripts": {
     "dev": "vite build --watch",
     "dev:app": "vite build --config vite.app.config.ts --mode=development",
+    "dev:embed-siyuan": "vite build --config vite.embed-siyuan.config.ts --mode=development",
     "release": "node ./release.js",
     "release:manual": "node ./release.js --mode=manual",
     "release:patch": "node ./release.js --mode=patch",
     "release:minor": "node ./release.js --mode=minor",
     "release:major": "node ./release.js --mode=major",
     "build:app": "vite build --config vite.app.config.ts",
+    "build:embed-siyuan": "vite build --config vite.embed-siyuan.config.ts",
     "build:plugin": "vite build",
-    "build": "pnpm build:app && pnpm build:plugin"
+    "build": "pnpm build:app && pnpm build:embed-siyuan && pnpm build:plugin"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "html2canvas": "^1.4.1",
     "lodash": "^4.17.21",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
