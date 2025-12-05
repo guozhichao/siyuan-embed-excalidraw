@@ -81,6 +81,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.7.2
+    + Feature: Image right top edit button
 + v0.7.1
     + Add QQ group
 + v0.7.0
