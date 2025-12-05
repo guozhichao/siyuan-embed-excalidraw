@@ -81,6 +81,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.7.0
+    + Featrue: SiYuan block link support pop-up window
 + v0.6.0
     + Feature: SiYuan block & non-cross-domain iframe can be rendered as images
 + v0.5.1

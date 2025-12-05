@@ -449,11 +449,32 @@ const setupMutationObserver = () => {
           }
         });
       }
+      else if (mutation.type === 'attributes') {
+        if (mutation.attributeName === 'class'
+          && mutation.target.nodeType === Node.ELEMENT_NODE
+          && (mutation.target as HTMLElement).classList.contains('excalidraw-tooltip--visible')
+          && window.frameElement
+          && mutation.target.textContent?.startsWith('siyuan://blocks/')
+        ) {
+          const tooltip = mutation.target as HTMLElement;
+          const rect = tooltip.getBoundingClientRect();
+          const frameRect = window.frameElement.getBoundingClientRect();
+          const blockID = mutation.target.textContent.split('siyuan://blocks/').pop();
+          postMessage({
+            event: 'triggleHoverBlock',
+            blockID: blockID,
+            x: frameRect.left + rect.left,
+            y: frameRect.top + rect.top,
+          });
+        }
+      }
     }
   });
 
   mutationObserver.observe(document, {
     childList: true,
+    attributes: true,
+    attributeFilter: ['class'],
     subtree: true
   });
 }

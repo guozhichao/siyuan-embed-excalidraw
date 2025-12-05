@@ -559,6 +559,17 @@ export default class ExcalidrawPlugin extends Plugin {
           this.tab.close();
         };
 
+        const onTriggleHoverBlock = (message: any) => {
+          if (message.blockID) {
+            that.addFloatLayer({
+              refDefs: [{ refID: message.blockID, defIDs: [] }],
+              x: message.x,
+              y: message.y,
+              isBacklink: false
+            });
+          }
+        }
+
         const messageEventHandler = (event) => {
           if (!((event.source.location.href as string).includes(`iframeID=${iframeID}`))) return;
           if (event.data && event.data.length > 0) {
@@ -580,6 +591,9 @@ export default class ExcalidrawPlugin extends Plugin {
                 }
                 else if (message.event == "exit") {
                   onExit(message);
+                }
+                else if (message.event == 'triggleHoverBlock') {
+                  onTriggleHoverBlock(message);
                 }
               }
             }
@@ -669,6 +683,17 @@ export default class ExcalidrawPlugin extends Plugin {
       dialog.destroy();
     };
 
+    const onTriggleHoverBlock = (message: any) => {
+      if (message.blockID) {
+        this.addFloatLayer({
+          refDefs: [{ refID: message.blockID, defIDs: [] }],
+          x: message.x,
+          y: message.y,
+          isBacklink: false
+        });
+      }
+    }
+
     let isFullscreen = false;
     let dialogContainerStyle = {
       width: "100vw",
@@ -733,6 +758,9 @@ export default class ExcalidrawPlugin extends Plugin {
             }
             else if (message.event == "toggleFullscreen") {
               switchFullscreen();
+            }
+            else if (message.event == 'triggleHoverBlock') {
+              onTriggleHoverBlock(message);
             }
           }
         }
