@@ -62,14 +62,12 @@ export default class ExcalidrawPlugin extends Plugin {
     this.initSetting();
 
     this._mutationObserver = this.setAddImageBlockMuatationObserver(document.body, (blockElement: HTMLElement) => {
-      if (this.data[STORAGE_NAME].labelDisplay === "noLabel") return;
-
       const imageElement = blockElement.querySelector("img") as HTMLImageElement;
       if (imageElement) {
         const imageURL = imageElement.getAttribute("data-src");
         this.getExcalidrawImageInfo(imageURL, false).then((imageInfo) => {
           if (imageInfo) {
-            this.updateAttrLabel(imageInfo, blockElement);
+            if (this.data[STORAGE_NAME].labelDisplay !== "noLabel") this.updateAttrLabel(imageInfo, blockElement);
 
             const actionElement = blockElement.querySelector(".protyle-action") as HTMLElement;
             if (actionElement) {
