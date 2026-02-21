@@ -81,6 +81,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.7.6
+    + Fix: Excalidraw dark mode color inconsistency with SiYuan dark mode
 + v0.7.5
     + Fix: edit button can only modify image once
 + v0.7.4

@@ -2,7 +2,7 @@
   "name": "siyuan-embed-excalidraw",
   "author": "Yuxin Zhao",
   "url": "https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "minAppVersion": "3.0.0",
   "disabledInPublish": true,
   "backends": [
@@ -25,7 +25,7 @@
   },
   "funding": {
     "custom": [
-      "https://ld246.com/article/1763408501738"
+      "https://yuxinzhao.net/sponsor"
     ]
   },
   "keywords": []

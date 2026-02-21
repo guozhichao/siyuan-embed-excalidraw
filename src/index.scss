@@ -52,7 +52,7 @@
 }
 
 html[data-theme-mode="dark"] img[src^="assets/excalidraw-"] {
-    filter: invert(0.8) brightness(1.2);
+    filter: invert(93%) hue-rotate(180deg);
 }
 
 div[data-type='NodeParagraph']:not(:hover) .protyle-attr .label--embed-excalidraw:not(.label--embed-excalidraw--always) {
