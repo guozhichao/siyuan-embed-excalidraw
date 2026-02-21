@@ -119,6 +119,20 @@ export default class ExcalidrawPlugin extends Plugin {
         });
       },
     }];
+    // 注册快捷键（都默认置空）
+    this.addCommand({
+      langKey: "createExcalidraw",
+      hotkey: "",
+      editorCallback: (protyle) => {
+        this.newExcalidrawImage(protyle.getInstance(), (imageInfo) => {
+          if (!this.isMobile && this.data[STORAGE_NAME].editWindow === 'tab') {
+            this.openEditTab(imageInfo);
+          } else {
+            this.openEditDialog(imageInfo);
+          }
+        });
+      },
+    });
 
     this._openMenuImageHandler = this.openMenuImageHandler.bind(this);
     this.eventBus.on("open-menu-image", this._openMenuImageHandler);

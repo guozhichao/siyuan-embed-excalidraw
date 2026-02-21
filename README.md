@@ -81,6 +81,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.7.7
+    + Feature: Quickly create Excalidraw images with shortcut
 + v0.7.6
     + Fix: Excalidraw dark mode color inconsistency with SiYuan dark mode
 + v0.7.5
