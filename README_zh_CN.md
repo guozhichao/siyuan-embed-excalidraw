@@ -19,6 +19,7 @@
 > 重要提示：为提升文档加载速度，本插件只识别以 `excalidraw-` 开头的图片，如果您发现原有的Excalidraw图片不显示编辑按钮，请重命名图片为 `excalidraw-` 开头的文件名。
 
 > 「嵌入式系列」思源插件QQ交流群：1037356690
+>
 > 赞助: https://yuxinzhao.net/sponsor
 
 ## 嵌入式系列
