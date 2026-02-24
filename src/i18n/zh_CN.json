@@ -15,5 +15,7 @@
   "themeMode": "主题模式",
   "themeModeDescription": "窗口的主题",
   "snippets": "代码片段",
-  "snippetsDescription": "让思源代码片段在Excalidraw中生效"
+  "snippetsDescription": "让思源代码片段在Excalidraw中生效",
+  "enableAutoSave": "启用自动保存",
+  "enableAutoSaveDescription": "编辑时自动保存内容（关闭时始终保存）"
 }
