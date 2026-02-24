@@ -234,6 +234,7 @@ export default class ExcalidrawPlugin extends Plugin {
       this.data[STORAGE_NAME].themeMode = (dialog.element.querySelector("[data-type='themeMode']") as HTMLSelectElement).value;
       this.data[STORAGE_NAME].snippets = Array.from(dialog.element.querySelectorAll("[data-type='snippets'] input[data-id]:checked")).map(element => element.getAttribute("data-id"));
       this.data[STORAGE_NAME].enableAutoSave = (dialog.element.querySelector("[data-type='enableAutoSave']") as HTMLInputElement).checked;
+      this.data[STORAGE_NAME].autoSaveInterval = (dialog.element.querySelector("[data-type='autoSaveInterval']") as HTMLInputElement).value;
       this.saveData(STORAGE_NAME, this.data[STORAGE_NAME]);
       this.reloadAllEditor();
       this.removeAllExcalidrawTab();
@@ -251,6 +252,7 @@ export default class ExcalidrawPlugin extends Plugin {
     if (typeof this.data[STORAGE_NAME].themeMode === 'undefined') this.data[STORAGE_NAME].themeMode = "themeLight";
     if (typeof this.data[STORAGE_NAME].snippets === 'undefined') this.data[STORAGE_NAME].snippets = [];
     if (typeof this.data[STORAGE_NAME].enableAutoSave === 'undefined') this.data[STORAGE_NAME].enableAutoSave = true;
+    if (typeof this.data[STORAGE_NAME].autoSaveInterval === 'undefined') this.data[STORAGE_NAME].autoSaveInterval = 0;
 
     this.settingItems = [
       {
@@ -316,6 +318,24 @@ export default class ExcalidrawPlugin extends Plugin {
         },
       },
       {
+        title: this.i18n.enableAutoSave,
+        direction: "column",
+        description: this.i18n.enableAutoSaveDescription,
+        createActionElement: async () => {
+          const element = HTMLToElement(`<input type="checkbox" class="b3-switch fn__flex-center" data-type="enableAutoSave">`) as HTMLInputElement;
+          element.checked = this.data[STORAGE_NAME].enableAutoSave;
+          return element;
+        },
+      },
+      {
+        title: this.i18n.autoSaveInterval,
+        direction: "column",
+        description: this.i18n.autoSaveIntervalDescription,
+        createActionElement: async () => {
+          return HTMLToElement(`<input type="number" class="b3-text-field fn__flex-center" data-type="autoSaveInterval" min="0" value="${this.data[STORAGE_NAME].autoSaveInterval}">`);
+        },
+      },
+      {
         title: this.i18n.snippets,
         direction: "row",
         description: this.i18n.snippetsDescription,
@@ -339,16 +359,6 @@ export default class ExcalidrawPlugin extends Plugin {
               checkbox.checked = true;
             }
           });
-          return element;
-        },
-      },
-      {
-        title: this.i18n.enableAutoSave,
-        direction: "column",
-        description: this.i18n.enableAutoSaveDescription,
-        createActionElement: async () => {
-          const element = HTMLToElement(`<input type="checkbox" class="b3-switch fn__flex-center" data-type="enableAutoSave">`) as HTMLInputElement;
-          element.checked = this.data[STORAGE_NAME].enableAutoSave;
           return element;
         },
       },
@@ -574,7 +584,7 @@ export default class ExcalidrawPlugin extends Plugin {
         const iframeID = encodeURIComponent(unicodeToBase64(`excalidraw-edit-tab-${imageInfo.imageURL}`));
         const editTabHTML = `
 <div class="excalidraw-edit-tab">
-    <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}${that.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}&enableAutoSave=${that.data[STORAGE_NAME].enableAutoSave}"></iframe>
+    <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}${that.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}&enableAutoSave=${that.data[STORAGE_NAME].enableAutoSave}&autoSaveInterval=${that.data[STORAGE_NAME].autoSaveInterval}"></iframe>
 </div>`;
         this.element.innerHTML = editTabHTML;
 
@@ -688,7 +698,7 @@ export default class ExcalidrawPlugin extends Plugin {
     <div class="edit-dialog-header resize__move"></div>
     <div class="edit-dialog-container">
         <div class="edit-dialog-editor">
-            <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}&fullscreenBtn=1${this.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}&enableAutoSave=${this.data[STORAGE_NAME].enableAutoSave}"></iframe>
+            <iframe src="/plugins/siyuan-embed-excalidraw/app/?lang=${window.siyuan.config.lang.replace('_', '-')}&fullscreenBtn=1${this.isDarkMode() ? "&dark=1" : ""}&iframeID=${iframeID}&imageURL=${encodeURIComponent(imageInfo.imageURL)}&enableAutoSave=${this.data[STORAGE_NAME].enableAutoSave}&autoSaveInterval=${this.data[STORAGE_NAME].autoSaveInterval}"></iframe>
         </div>
         <div class="fn__hr--b"></div>
     </div>

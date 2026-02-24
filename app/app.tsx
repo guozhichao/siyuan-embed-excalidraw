@@ -42,6 +42,8 @@ window.EXCALIDRAW_ASSET_PATH = '/plugins/siyuan-embed-excalidraw/app/';
 window.EXCALIDRAW_LIBRARY_PATH = '/data/storage/petal/siyuan-embed-excalidraw/library.excalidrawlib';
 const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
+const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
+const autoSaveInterval = Math.max(parseInt(urlParams.get('autoSaveInterval') || '0') * 1000, 300);
 let mimeType = 'image/svg+xml';
 let imageURL = '';
 const exportPadding = 10;
@@ -265,11 +267,16 @@ const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | R
 }
 
 const App = (props: { initialData: any }) => {
-  const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
-
   // 300ms内没有修改才保存
+  let lastSaveTime = 0;
   const debouncedSave = React.useCallback(
-    debounce(() => { save("autosave"); }, 300),
+    debounce(() => {
+      let currentTime = Date.now();
+      if (currentTime - lastSaveTime > autoSaveInterval) {
+        lastSaveTime = currentTime;
+        save("autosave");
+      }
+    }, 300),
     []
   );
 

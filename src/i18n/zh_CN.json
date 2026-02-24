@@ -17,5 +17,7 @@
   "snippets": "代码片段",
   "snippetsDescription": "让思源代码片段在Excalidraw中生效",
   "enableAutoSave": "启用自动保存",
-  "enableAutoSaveDescription": "编辑时自动保存内容（关闭时始终保存）"
+  "enableAutoSaveDescription": "编辑时自动保存内容（注意:关闭时不会自动保存）",
+  "autoSaveInterval": "自动保存间隔",
+  "autoSaveIntervalDescription": "自动保存的间隔时间，单位为秒 (设置为0则即时保存)"
 }

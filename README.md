@@ -81,6 +81,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v0.8.0
+    + Feature: Set whether to enable auto save and auto save time interval
 + v0.7.8
     + Optimize: Only images starting with `excalidraw-` will show edit button and label to optimize document loading speed
 + v0.7.7
