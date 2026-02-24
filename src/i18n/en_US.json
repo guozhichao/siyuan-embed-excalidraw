@@ -15,5 +15,7 @@
   "themeMode": "Theme Mode",
   "themeModeDescription": "Theme of window",
   "snippets": "Snippets",
-  "snippetsDescription": "Make SiYuan snippets available at Excalidraw"
+  "snippetsDescription": "Make SiYuan snippets available at Excalidraw",
+  "enableAutoSave": "Enable Auto Save",
+  "enableAutoSaveDescription": "Automatically save content during editing (always save when closing)"
 }

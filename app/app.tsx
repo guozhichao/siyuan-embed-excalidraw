@@ -265,6 +265,8 @@ const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | R
 }
 
 const App = (props: { initialData: any }) => {
+  const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
+
   // 300ms内没有修改才保存
   const debouncedSave = React.useCallback(
     debounce(() => { save("autosave"); }, 300),
@@ -279,7 +281,11 @@ const App = (props: { initialData: any }) => {
       return;
     }
     if (!window.excalidrawAPI) return;
-    debouncedSave();
+
+    // 只有启用自动保存时才执行防抖保存
+    if (enableAutoSave) {
+      debouncedSave();
+    }
   };
 
   let libraryChangeInitStatus = true;
