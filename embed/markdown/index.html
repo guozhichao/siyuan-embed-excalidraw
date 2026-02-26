@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markdown Editor in Excalidraw</title>
+  <style>
+    body, #root, .vditor {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      --panel-background-color: transparent;
+    }
+    .vditor {
+      border: none !important;
+    }
+    .vditor-toolbar {
+      border: none !important;
+      background: transparent !important;
+    }
+    .vditor-preview {
+      border: none !important;
+    }
+    .vditor-reset {
+      padding: 8px !important;
+    }
+  </style>
+</head>
+<body tabindex="0">
+  <div id="root"></div>
+  <script type="module" src="./index.ts"></script>
+</body>
+</html>

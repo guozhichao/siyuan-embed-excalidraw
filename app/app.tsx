@@ -12,6 +12,7 @@ import {
   serializeLibraryAsJSON,
   MainMenu,
   getCommonBounds,
+  viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import './app.scss';
@@ -26,6 +27,7 @@ import {
   arrayToBase64,
   locatePNGtEXt,
   insertPNGtEXt,
+  HTMLToElement,
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
@@ -35,6 +37,7 @@ import {
   createCanvasFromIframe,
   drawCanvasOnCanvas,
 } from './utils';
+import { nanoid } from "nanoid";
 
 addStyle("/stage/protyle/js/katex/katex.min.css", "protyleKatexStyle");
 
@@ -52,19 +55,33 @@ const postMessage = (message: any) => {
   window.parent?.postMessage(JSON.stringify(message), '*');
 };
 
-const getEmbeddableLink = (link: string): string => {
+const getEmbeddableLink = (element: any): string => {
+  if (element?.type !== 'embeddable') return '';
+
+  const link = element?.link || '';
+
+  // 处理思源块链接
   if (link?.startsWith('siyuan://blocks/')) {
     const blockID = link.split('siyuan://blocks/')[1];
-    link = `/plugins/siyuan-embed-excalidraw/embed/siyuan?id=${blockID}`;
+    return `/plugins/siyuan-embed-excalidraw/embed/siyuan?id=${blockID}`;
   }
+
+  // 处理 Markdown 链接 (通过检查 customData.markdown 是否存在)
+  if (element?.type === "embeddable" && element?.customData?.markdown) {
+    return `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${element.id}`;
+  }
+
   return link;
 }
 
 const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
+  const src = getEmbeddableLink(element);
+  if (!src) return null;
+  
   return (
     <iframe
       className="excalidraw__embeddable"
-      src={getEmbeddableLink(element.link || '')}
+      src={src}
       referrerPolicy="no-referrer-when-downgrade"
       title="Excalidraw Embedded Content"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -447,6 +464,67 @@ const addLibrary = async (libraryUrlTokens: { libraryUrl: string, idToken: strin
   document.getElementById('root')!.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100vh;">${ok ? 'Add Library Success' : 'Add Library Fail'}</div>`;
 }
 
+const getMarkdownToolButton = () => {
+  const html = `
+<button data-testid="toolbar-markdown" class="dropdown-menu-item dropdown-menu-item-base">
+  <div class="dropdown-menu-item__icon">
+    <svg aria-hidden="true" focusable="false" role="img" t="1772027273314" class="" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7889" width="20" height="20"><path d="M92 192C42.24 192 0 232.128 0 282.016v459.968C0 791.904 42.24 832 92 832h840C981.76 832 1024 791.872 1024 741.984V282.016C1024 232.16 981.76 192 932 192z m0 64h840c16.512 0 28 12.256 28 26.016v459.968c0 13.76-11.52 26.016-28 26.016H92C75.488 768 64 755.744 64 741.984V282.016c0-13.76 11.52-25.984 28-25.984zM160 352v320h96v-212.992l96 127.008 96-127.04V672h96V352h-96l-96 128-96-128z m544 0v160h-96l144 160 144-160h-96v-160z" p-id="7890"></path></svg>
+  </div>
+  <div class="dropdown-menu-item__text"> Markdown </div>
+</button>`.trim();
+  const element = HTMLToElement(html);
+  element.addEventListener('click', () => {
+    const elementID = nanoid();
+    const appState = window.excalidrawAPI.getAppState();
+    const { x, y } = viewportCoordsToSceneCoords(
+      { clientX: appState.width / 2, clientY: appState.height / 2 },
+      appState,
+    );
+
+    // 创建 Markdown embeddable 元素
+    const newElement = {
+      id: elementID,
+      type: 'embeddable',
+      x,
+      y,
+      width: 400,
+      height: 400,
+      angle: 0,
+      strokeColor: 'transparent',
+      backgroundColor: 'transparent',
+      fillStyle: 'solid',
+      strokeWidth: 2,
+      strokeStyle: 'solid',
+      roughness: 1,
+      opacity: 100,
+      groupIds: [],
+      frameId: null,
+      index: 'aO',
+      roundness: null,
+      seed: Math.floor(Math.random() * 10000),
+      version: 1,
+      versionNonce: Math.floor(Math.random() * 10000),
+      isDeleted: false,
+      boundElements: [],
+      updated: Date.now(),
+      link: `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${elementID}`,
+      locked: false,
+      customData: {
+        markdown: {
+          content: '',
+          config: {
+          },
+        },
+      },
+    };
+
+    const sceneElements = window.excalidrawAPI.getSceneElements();
+    window.excalidrawAPI.updateScene({ elements: [...sceneElements, newElement] });
+  });
+
+  return element;
+}
+
 const setupMutationObserver = () => {
   const mutationObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
@@ -459,6 +537,10 @@ const setupMutationObserver = () => {
                 postMessage({ event: 'browseLibrary' });
               });
             });
+            const lastTool = addedElement.querySelector(".dropdown-menu-item[data-testid='toolbar-laser']");
+            if (lastTool) {
+              lastTool.insertAdjacentElement('afterend', getMarkdownToolButton());
+            }
           }
         });
       }
