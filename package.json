@@ -25,12 +25,13 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "@zumer/snapdom": "^2.0.2",
     "html2canvas": "^1.4.1",
     "lodash": "^4.17.21",
     "nanoid": "^5.1.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "vditor": "^3.10.9"
+    "vditor": "^3.11.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.8.1",

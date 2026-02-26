@@ -120,6 +120,11 @@ export async function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
+export async function blobToArray(blob: Blob): Promise<Uint8Array> {
+  const arrayBuffer = await blob.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+
 export function mimeTypeToFormat(mime: string): string {
   const mineToFormat = {
     'image/svg+xml': 'svg',

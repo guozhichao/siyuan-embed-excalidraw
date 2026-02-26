@@ -11,33 +11,29 @@ import {
   mergeLibraryItems,
   serializeLibraryAsJSON,
   MainMenu,
-  getCommonBounds,
   viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import './app.scss';
 import {
   unicodeToBase64,
-  base64ToUnicode,
-  blobToDataURL,
   dataURLToBlob,
   getImageSizeFromBase64,
   addStyle,
-  base64ToArray,
   arrayToBase64,
   locatePNGtEXt,
   insertPNGtEXt,
   HTMLToElement,
+  blobToArray,
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
 import defaultImageContent from "../src/default.json";
-import {
-  createCanvasFromDataURL,
-  createCanvasFromIframe,
-  drawCanvasOnCanvas,
-} from './utils';
 import { nanoid } from "nanoid";
+import {
+  captureAllIframes,
+  replaceIframesWithImages,
+} from './utils/iframeCapture';
 
 addStyle("/stage/protyle/js/katex/katex.min.css", "protyleKatexStyle");
 
@@ -77,7 +73,7 @@ const getEmbeddableLink = (element: any): string => {
 const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null => {
   const src = getEmbeddableLink(element);
   if (!src) return null;
-  
+
   return (
     <iframe
       className="excalidraw__embeddable"
@@ -104,82 +100,6 @@ const fixImageContent = async (imageDataURL: string): Promise<string> => {
     return imageDataURL;
   }
 
-  // Iframe默认图
-  if (imageDataURL.startsWith('data:image/svg+xml;base64,')) {
-    let base64String = imageDataURL.split(',').pop() as string;
-    let xmlStr = base64ToUnicode(base64String);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlStr, 'image/svg+xml');
-    const svg = doc.documentElement as HTMLElement;
-    for (const iframe of Array.from(svg.querySelectorAll('iframe'))) {
-      const link = iframe.getAttribute('src') || '';
-      const embedLink = getEmbeddableLink(link);
-      if (embedLink !== link) {
-        iframe.setAttribute('src', embedLink);
-      }
-      if (!embedLink) continue;
-      if (embedLink.startsWith('http')) continue; // 不处理跨域iframe，因为html2canvas不支持
-      if (iframe.parentElement?.parentElement?.tagName?.toLowerCase() === 'foreignobject') {
-        const foreignObject = iframe.parentElement.parentElement;
-        const originIframe = document.querySelector(`.excalidraw__embeddable-container__inner iframe[src="${embedLink}"]`) as HTMLIFrameElement;
-        if (!originIframe) continue;
-
-        const scale = 1.2;
-        const padding = 1;
-        let iframeCanvas = await createCanvasFromIframe(originIframe, scale, padding);
-        if (!iframeCanvas) continue;
-
-        const iframeDataURL = iframeCanvas.toDataURL();
-        const background = document.createElementNS('http://www.w3.org/2000/svg', 'image') as SVGImageElement;
-        background.setAttribute('href', iframeDataURL);
-        background.style = `width: ${parseInt(foreignObject.style.width) - 2 * padding}px; height: ${parseInt(foreignObject.style.height) - 2 * padding}px;`;
-        background.setAttribute('transform', `translate(${padding} ${padding})`);
-        foreignObject.insertAdjacentElement('beforebegin', background);
-
-        if (embedLink.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) {
-          foreignObject.remove();
-        }
-      }
-    }
-    xmlStr = svg.outerHTML;
-    base64String = unicodeToBase64(xmlStr);
-    imageDataURL = `data:image/svg+xml;base64,${base64String}`;
-  }
-  if (imageDataURL.startsWith('data:image/png;base64,')) {
-    const allElements = window.excalidrawAPI.getSceneElements() as any[];
-    const embeddableElements = allElements.filter(element => element.type === 'embeddable');
-    if (embeddableElements.length > 0) {
-      let canvas = await createCanvasFromDataURL(imageDataURL);
-      const [minX, minY, maxX, maxY] = getCommonBounds(allElements);
-      const originX = minX - exportPadding;
-      const originY = minY - exportPadding;
-
-      for (const embeddableElement of embeddableElements) {
-        const link = embeddableElement.link || '';
-        const embedLink = getEmbeddableLink(link);
-        if (!embedLink) continue;
-        if (embedLink.startsWith('http')) continue; // 不处理跨域iframe，因为html2canvas不支持
-        const originIframe = document.querySelector(`.excalidraw__embeddable-container__inner iframe[src="${embedLink}"]`) as HTMLIFrameElement;
-        if (!originIframe) continue;
-
-        const scale = 1;
-        const padding = 1;
-        let iframeCanvas = await createCanvasFromIframe(originIframe, scale, padding);
-        if (!iframeCanvas) continue;
-
-        drawCanvasOnCanvas(canvas, iframeCanvas, embeddableElement.x - originX + padding, embeddableElement.y - originY + padding, embeddableElement.angle);
-      }
-      let binaryArray = base64ToArray(imageDataURL.split(',').pop() as string);
-      const location = locatePNGtEXt(binaryArray);
-      if (location) {
-        const metadataArray = binaryArray.subarray(location.index, location.index + location.length);
-        binaryArray = base64ToArray(canvas.toDataURL().split(',').pop() as string);
-        binaryArray = insertPNGtEXt(binaryArray, metadataArray);
-        const base64String = arrayToBase64(binaryArray);
-        imageDataURL = `data:image/png;base64,${base64String}`;
-      }
-    }
-  }
   return imageDataURL;
 }
 
@@ -200,41 +120,115 @@ const triggleToast = (messageType: 'saving' | 'savedone') => {
 
 const save = async (eventName: 'save' | 'autosave') => {
   if (!window.excalidrawAPI) return;
-  if (!document.hasFocus()) return; // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
+  if (!document.hasFocus()) return;
 
   if (eventName === 'save') triggleToast('saving');
 
+  const elements = window.excalidrawAPI.getSceneElements();
+  const files = window.excalidrawAPI.getFiles();
+
+  // ========== 第一步：捕获所有 iframe，得到替换后的 elements ==========
+  const iframeSvgMap = await captureAllIframes(elements);
+  const { elements: processedElements, files: processedFiles } = replaceIframesWithImages(
+    elements,
+    iframeSvgMap,
+    files
+  );
+
+  // ========== 第二步：根据 mimeType 选择分支处理 ==========
   let imageDataURL = '';
+
   if (mimeType === 'image/svg+xml') {
-    const svg = await exportToSvg({
-      elements: window.excalidrawAPI.getSceneElements(),
+    // ===== SVG 分支 =====
+    
+    // a. 导出原始 SVG（包含完整 iframe 渲染）
+    const originalSvg = await exportToSvg({
+      elements: elements,
       appState: {
         ...window.excalidrawAPI.getAppState(),
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
       },
-      files: window.excalidrawAPI.getFiles(),
-      renderEmbeddables: true,
+      files: files,
+      renderEmbeddables: false,
     });
-    imageDataURL = `data:${mimeType};base64,${unicodeToBase64(svg.outerHTML)}`
-  } else {
-    const blob = await exportToBlob({
-      elements: window.excalidrawAPI.getSceneElements(),
+
+    // b. 导出处理后 SVG（iframe 已替换为图像）
+    const processedSvg = await exportToSvg({
+      elements: processedElements,
       appState: {
         ...window.excalidrawAPI.getAppState(),
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
       },
-      files: window.excalidrawAPI.getFiles(),
-      mimeType: mimeType,
+      files: processedFiles,
+      renderEmbeddables: false,
+    });
+
+    // c. 替换 metadata
+    const originalMetadata = originalSvg.querySelector('metadata')?.innerHTML;
+    const processedMetadataEl = processedSvg.querySelector('metadata');
+    if (processedMetadataEl && originalMetadata) {
+      processedMetadataEl.innerHTML = originalMetadata;
+    }
+
+    // d. 转换为 dataURL
+    imageDataURL = `data:${mimeType};base64,${unicodeToBase64(processedSvg.outerHTML)}`;
+  } else {
+    // ===== PNG 分支 =====
+    
+    // a. 导出原始 PNG（包含完整 iframe 渲染）
+    const originalPngBlob = await exportToBlob({
+      elements: elements,
+      appState: {
+        ...window.excalidrawAPI.getAppState(),
+        exportWithDarkMode: false,
+        exportEmbedScene: true,
+        exportBackground: false,
+      },
+      files: files,
+      mimeType: 'image/png',
       exportPadding: exportPadding,
     });
-    imageDataURL = await blobToDataURL(blob);
+    const originalBinaryArray = await blobToArray(originalPngBlob);
+
+    // b. 导出处理后 PNG（iframe 已替换为图像）
+    const processedPngBlob = await exportToBlob({
+      elements: processedElements,
+      appState: {
+        ...window.excalidrawAPI.getAppState(),
+        exportWithDarkMode: false,
+        exportEmbedScene: true,
+        exportBackground: false,
+      },
+      files: processedFiles,
+      mimeType: 'image/png',
+      exportPadding: exportPadding,
+    });
+    const processedBinaryArray = await blobToArray(processedPngBlob);
+
+    // c. 从原始 PNG 中提取 tEXt 块
+    const location = locatePNGtEXt(originalBinaryArray);
+    if (location) {
+      // d. 插入 tEXt 块到处理后 PNG
+      const metadataArray = originalBinaryArray.subarray(
+        location.index,
+        location.index + location.length
+      );
+      const finalBinaryArray = insertPNGtEXt(processedBinaryArray, metadataArray);
+      const base64String = arrayToBase64(finalBinaryArray);
+      imageDataURL = `data:image/png;base64,${base64String}`;
+    } else {
+      const base64String = arrayToBase64(originalBinaryArray);
+      imageDataURL = `data:image/png;base64,${base64String}`;
+    }
   }
+
   imageDataURL = await fixImageContent(imageDataURL);
 
+  // ========== 第三步：保存 ==========
   if (!document.hasFocus()) return; // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
 
   const blob = dataURLToBlob(imageDataURL);
@@ -243,6 +237,7 @@ const save = async (eventName: 'save' | 'autosave') => {
   formData.append("path", 'data/' + imageURL);
   formData.append("file", file);
   formData.append("isDir", "false");
+
   fetchPost("/api/file/putFile", formData, () => {
     postMessage({
       event: eventName,
@@ -284,7 +279,7 @@ const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | R
 }
 
 const App = (props: { initialData: any }) => {
-  // 300ms内没有修改才保存
+  // 300ms 内没有修改才保存
   let lastSaveTime = 0;
   const debouncedSave = React.useCallback(
     debounce(() => {
@@ -507,7 +502,7 @@ const getMarkdownToolButton = () => {
       isDeleted: false,
       boundElements: [],
       updated: Date.now(),
-      link: `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${elementID}`,
+      link: `markdown`,
       locked: false,
       customData: {
         markdown: {

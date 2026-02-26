@@ -52,6 +52,10 @@ export default defineConfig(({
     plugins: [
       viteStaticCopy({
         targets: [
+          {
+            src: "../../node_modules/vditor/dist/",
+            dest: "./vditor/",
+          },
         ],
       }),
     ],
