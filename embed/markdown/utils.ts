@@ -47,6 +47,10 @@ export function updateElementData(elementId: string, markdownData: MarkdownData)
     const elements = api.getSceneElements().map((element: any) => {
       if (element.id === elementId) {
         element.customData.markdown = markdownData;
+        element.customData.iframeVersionNonce = Math.floor(Math.random() * 10000);
+        element.version = element.version + 1;
+        element.versionNonce = Math.floor(Math.random() * 10000);
+        element.updated = Date.now();
       }
       return element;
     });

@@ -1,4 +1,5 @@
 import { snapdom } from '@zumer/snapdom';
+import { processArraySequentially } from '../../src/utils/task';
 
 /**
  * 判断元素是否需要 iframe 捕获处理
@@ -55,6 +56,8 @@ export async function captureIframe(
   }
 }
 
+const iframeCache = new Map<string, {iframeVersionNonce: number, width: number, height: number, content: string}>();
+
 /**
  * 为所有需要处理的元素捕获 iframe
  */
@@ -64,27 +67,42 @@ export async function captureAllIframes(
   const iframeMap = new Map<string, string>();
   
   const elementsToCapture = elements.filter(needsIframeCapture);
-  
-  await Promise.all(
-    elementsToCapture.map(async (el) => {
-      const iframe = getIframeForElement(el);
-      if (!iframe) return;
-      
-      // 等待 iframe 加载
-      await new Promise<void>((resolve) => {
-        if (iframe.contentDocument?.readyState === 'complete') {
-          resolve();
-        } else {
-          iframe.addEventListener('load', () => resolve(), { once: true });
-        }
-      });
-      
-      const svgContent = await captureIframe(iframe);
-      if (svgContent) {
-        iframeMap.set(el.id, svgContent);
+
+  const captureElement = async (element: any) => {
+    const iframe = getIframeForElement(element);
+    if (!iframe) return;
+
+    const cache = iframeCache.get(element.id);
+    if (cache && cache.iframeVersionNonce === element.customData?.iframeVersionNonce && cache.width === element.width && cache.height === element.height) {
+      iframeMap.set(element.id, cache.content);
+      return;
+    }
+    
+    // 等待 iframe 加载
+    await new Promise<void>((resolve) => {
+      if (iframe.contentDocument?.readyState === 'complete') {
+        resolve();
+      } else {
+        iframe.addEventListener('load', () => resolve(), { once: true });
       }
-    })
-  );
+    });
+    
+    const svgContent = await captureIframe(iframe);
+    if (svgContent) {
+      iframeMap.set(element.id, svgContent);
+      iframeCache.set(element.id, {
+        iframeVersionNonce: element.customData?.iframeVersionNonce,
+        width: element.width,
+        height: element.height,
+        content: svgContent,
+      });
+    }
+  };
+
+  // elementsToCapture.forEach(captureElement);
+  // await Promise.all(elementsToCapture.map(captureElement));
+  // await idleTimeSlice(elementsToCapture, captureElement, { chunkTimeout: 500, globalTimeout: 10000 });
+  await processArraySequentially(elementsToCapture, captureElement);
   
   return iframeMap;
 }

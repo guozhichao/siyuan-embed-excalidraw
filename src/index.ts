@@ -608,9 +608,6 @@ export default class ExcalidrawPlugin extends Plugin {
         }
 
         const onSave = (message: any) => {
-          if (message.imageURL === imageInfo.imageURL) {
-            imageInfo.data = message.data;
-          }
           const imageURL = message.imageURL;
           fetch(imageURL, { cache: 'reload' }).then(() => {
             document.querySelectorAll(`img[src='${imageURL}']`).forEach(imageElement => {
@@ -732,9 +729,6 @@ export default class ExcalidrawPlugin extends Plugin {
     }
 
     const onSave = (message: any) => {
-      if (message.imageURL === imageInfo.imageURL) {
-        imageInfo.data = message.data;
-      }
       const imageURL = message.imageURL;
       fetch(imageURL, { cache: 'reload' }).then(() => {
         document.querySelectorAll(`img[src='${imageURL}']`).forEach(imageElement => {

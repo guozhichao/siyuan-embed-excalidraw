@@ -16,15 +16,16 @@ import {
 import '@excalidraw/excalidraw/index.css';
 import './app.scss';
 import {
-  unicodeToBase64,
-  dataURLToBlob,
-  getImageSizeFromBase64,
   addStyle,
-  arrayToBase64,
   locatePNGtEXt,
-  insertPNGtEXt,
   HTMLToElement,
   blobToArray,
+  blobToDataURL,
+  base64ToUnicode,
+  replaceSubArray,
+  base64ToArray,
+  getSVGSize,
+  getPNGSize,
 } from '../src/utils';
 import { fetchPost } from '../src/utils/fetch';
 import { isMac, matchHotKey } from '../src/utils/hotkey';
@@ -43,9 +44,19 @@ const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
 const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
 const autoSaveInterval = Math.max(parseInt(urlParams.get('autoSaveInterval') || '0') * 1000, 300);
+let saveStatus = {
+  complete: true,
+  saving: false, 
+};
+let saveTimer : ReturnType<typeof setTimeout> | null = null;
+const saveTimeout = 10_000;
 let mimeType = 'image/svg+xml';
 let imageURL = '';
 const exportPadding = 10;
+let savedSvg : HTMLElement | null = null;
+let savedPngBinaryArray : Uint8Array | null = null;
+let defaultSvg : HTMLElement | null = null;
+let defaultPngBinaryArray : Uint8Array | null = null;
 
 const postMessage = (message: any) => {
   window.parent?.postMessage(JSON.stringify(message), '*');
@@ -87,45 +98,133 @@ const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null
   )
 }
 
-const fixImageContent = async (imageDataURL: string): Promise<string> => {
+const fixSvgContent = (svg: HTMLElement): HTMLElement => {
   // 当图像为空时，使用默认的占位图
-  const imageSize = getImageSizeFromBase64(imageDataURL);
+  const imageSize = getSVGSize(svg);
   if (imageSize && imageSize.width <= 20 && imageSize.height <= 20) {
-    if (imageDataURL.startsWith('data:image/svg+xml;base64,')) {
-      imageDataURL = defaultImageContent['svg'];
-    }
-    if (imageDataURL.startsWith('data:image/png;base64,')) {
-      imageDataURL = defaultImageContent['png'];
-    }
-    return imageDataURL;
+    svg = defaultSvg as HTMLElement;
   }
-
-  return imageDataURL;
+  return svg;
 }
 
-const triggleToast = (messageType: 'saving' | 'savedone') => {
+const fixPngContent = (pngBinaryArray: Uint8Array): Uint8Array => {
+  const imageSize = getPNGSize(pngBinaryArray);
+  if (imageSize && imageSize.width <= 20 && imageSize.height <= 20) {
+    pngBinaryArray = defaultPngBinaryArray as Uint8Array;
+  }
+  return pngBinaryArray;
+}
+
+const triggleToast = (messageType: 'saving' | 'savedone' | 'savetimeout' | 'savecancel') => {
   if (!window.excalidrawAPI) return;
   let message = '';
+  let duration = 1000;
   if (messageType == 'savedone') {
     message = langCode.startsWith('zh') ? '保存成功' : 'Saved';
-  } else {
+    duration = 2000;
+  } else if (messageType == 'savetimeout') {
+    message = langCode.startsWith('zh') ? '保存超时' : 'Save timeout';
+    duration = 2000;
+  } else if (messageType == 'savecancel') {
+    message = langCode.startsWith('zh') ? '保存取消' : 'Save canceled';
+  } else if (messageType == 'saving') {
     message = langCode.startsWith('zh') ? '保存中...' : 'Saving...';
+    duration = Infinity;
   }
+  window.excalidrawAPI.setToast(null);
   window.excalidrawAPI.setToast({
     message: message,
     closable: false,
-    duration: 1000,
+    duration: duration,
   });
 }
 
-const save = async (eventName: 'save' | 'autosave') => {
-  if (!window.excalidrawAPI) return;
-  if (!document.hasFocus()) return;
-
-  if (eventName === 'save') triggleToast('saving');
-
+const renderImageContentWithOnlyMetadata = async (): Promise<Blob> => {
   const elements = window.excalidrawAPI.getSceneElements();
   const files = window.excalidrawAPI.getFiles();
+  const appState = window.excalidrawAPI.getAppState();
+
+  let blob : Blob | null = null;
+
+  if (mimeType === 'image/svg+xml') {
+    // ===== SVG 分支 =====
+
+    // a. 导出原始 SVG（包含完整 iframe 渲染）
+    const originalSvg = await exportToSvg({
+      elements: elements,
+      appState: {
+        ...appState,
+        exportWithDarkMode: false,
+        exportEmbedScene: true,
+        exportBackground: false,
+      },
+      files: files,
+      renderEmbeddables: false,
+    });
+
+    // b. 替换 metadata
+    if (savedSvg) {
+      const originalMetadata = originalSvg.querySelector('metadata')?.innerHTML;
+      const savedMetadataEl = savedSvg.querySelector('metadata');
+      if (savedMetadataEl && originalMetadata) {
+        savedMetadataEl.innerHTML = originalMetadata;
+      }
+    } else {
+      savedSvg = originalSvg;
+    }
+
+    savedSvg = fixSvgContent(savedSvg as HTMLElement);
+    
+    // c. 转换为 dataURL
+    blob = new Blob([savedSvg!.outerHTML], { type: 'image/svg+xml' });
+  } else {
+    // ===== PNG 分支 =====
+
+    // a. 导出原始 PNG（包含完整 iframe 渲染）
+    const originalPngBlob = await exportToBlob({
+      elements: elements,
+      appState: {
+        ...appState,
+        exportWithDarkMode: false,
+        exportEmbedScene: true,
+        exportBackground: false,
+      },
+      files: files,
+      mimeType: 'image/png',
+      exportPadding: exportPadding,
+    });
+    const originalBinaryArray = await blobToArray(originalPngBlob);
+
+    if (savedPngBinaryArray) {
+      // 从原始 PNG 中提取 tEXt 块
+      const originLocation = locatePNGtEXt(originalBinaryArray);
+      const savedLocation = locatePNGtEXt(savedPngBinaryArray);
+      if (originLocation && savedLocation) {
+        // 插入 tEXt 块到处理后 PNG
+        savedPngBinaryArray = replaceSubArray(
+          originalBinaryArray,
+          originLocation,
+          savedPngBinaryArray,
+          savedLocation,
+        );
+      } else {
+        savedPngBinaryArray = originalBinaryArray;
+      }
+    } else {
+      savedPngBinaryArray = originalBinaryArray;
+    }
+
+    savedPngBinaryArray = fixPngContent(savedPngBinaryArray);
+    blob = new Blob([savedPngBinaryArray as any], { type: "image/png" });
+  }
+
+  return blob;
+}
+
+const renderImageContentWithMetadataAndImage = async (): Promise<Blob> => {
+  const elements = window.excalidrawAPI.getSceneElements();
+  const files = window.excalidrawAPI.getFiles();
+  const appState = window.excalidrawAPI.getAppState();
 
   // ========== 第一步：捕获所有 iframe，得到替换后的 elements ==========
   const iframeSvgMap = await captureAllIframes(elements);
@@ -136,7 +235,7 @@ const save = async (eventName: 'save' | 'autosave') => {
   );
 
   // ========== 第二步：根据 mimeType 选择分支处理 ==========
-  let imageDataURL = '';
+  let blob: Blob | null = null;
 
   if (mimeType === 'image/svg+xml') {
     // ===== SVG 分支 =====
@@ -145,7 +244,7 @@ const save = async (eventName: 'save' | 'autosave') => {
     const originalSvg = await exportToSvg({
       elements: elements,
       appState: {
-        ...window.excalidrawAPI.getAppState(),
+        ...appState,
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
@@ -155,10 +254,10 @@ const save = async (eventName: 'save' | 'autosave') => {
     });
 
     // b. 导出处理后 SVG（iframe 已替换为图像）
-    const processedSvg = await exportToSvg({
+    let processedSvg = await exportToSvg({
       elements: processedElements,
       appState: {
-        ...window.excalidrawAPI.getAppState(),
+        ...appState,
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
@@ -174,16 +273,21 @@ const save = async (eventName: 'save' | 'autosave') => {
       processedMetadataEl.innerHTML = originalMetadata;
     }
 
-    // d. 转换为 dataURL
-    imageDataURL = `data:${mimeType};base64,${unicodeToBase64(processedSvg.outerHTML)}`;
+    processedSvg = fixSvgContent(processedSvg);
+
+    // 保存最后一次渲染的图像数据
+    savedSvg = processedSvg;
+
+    // d. 转换为 blob
+    blob = new Blob([processedSvg.outerHTML], { type: 'image/svg+xml' });
   } else {
     // ===== PNG 分支 =====
-    
+
     // a. 导出原始 PNG（包含完整 iframe 渲染）
     const originalPngBlob = await exportToBlob({
       elements: elements,
       appState: {
-        ...window.excalidrawAPI.getAppState(),
+        ...appState,
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
@@ -198,7 +302,7 @@ const save = async (eventName: 'save' | 'autosave') => {
     const processedPngBlob = await exportToBlob({
       elements: processedElements,
       appState: {
-        ...window.excalidrawAPI.getAppState(),
+        ...appState,
         exportWithDarkMode: false,
         exportEmbedScene: true,
         exportBackground: false,
@@ -207,31 +311,77 @@ const save = async (eventName: 'save' | 'autosave') => {
       mimeType: 'image/png',
       exportPadding: exportPadding,
     });
-    const processedBinaryArray = await blobToArray(processedPngBlob);
+    let processedBinaryArray = await blobToArray(processedPngBlob);
 
-    // c. 从原始 PNG 中提取 tEXt 块
-    const location = locatePNGtEXt(originalBinaryArray);
-    if (location) {
-      // d. 插入 tEXt 块到处理后 PNG
-      const metadataArray = originalBinaryArray.subarray(
-        location.index,
-        location.index + location.length
+    // c. 从 PNG 中提取 tEXt 块
+    const originLocation = locatePNGtEXt(originalBinaryArray);
+    const processedLocation = locatePNGtEXt(processedBinaryArray);
+    if (originLocation && processedLocation) {
+      // d. 替换 tEXt 块到处理后 PNG
+      processedBinaryArray = replaceSubArray(
+        originalBinaryArray,
+        originLocation,
+        processedBinaryArray,
+        processedLocation,
       );
-      const finalBinaryArray = insertPNGtEXt(processedBinaryArray, metadataArray);
-      const base64String = arrayToBase64(finalBinaryArray);
-      imageDataURL = `data:image/png;base64,${base64String}`;
     } else {
-      const base64String = arrayToBase64(originalBinaryArray);
-      imageDataURL = `data:image/png;base64,${base64String}`;
+      processedBinaryArray = originalBinaryArray;
     }
+
+    processedBinaryArray = fixPngContent(processedBinaryArray);
+
+    // 保存最后一次渲染的图像数据
+    savedPngBinaryArray = processedBinaryArray;
+
+    blob = new Blob([processedBinaryArray as any], { type: 'image/png' });
   }
 
-  imageDataURL = await fixImageContent(imageDataURL);
+  return blob;
+}
+
+const setSavingBegin = (complete: boolean): boolean => {
+  if (saveStatus.saving) return false;
+  saveStatus.saving = true;
+  if (complete) saveStatus.complete = true;
+  // saveTimer = setTimeout(() => {
+  //   saveStatus.saving = false;
+  //   if (complete) saveStatus.complete = false;
+  //   saveTimer = null;
+  //   triggleToast("savetimeout");
+  // }, saveTimeout);
+  return true;
+}
+
+const setSavingEnd = () => {
+  saveStatus.saving = false;
+  // if (saveTimer !== null) {
+  //   clearTimeout(saveTimer as unknown as number);
+  // }
+}
+
+const save = async (eventName: 'save' | 'autosave') => {
+  if (!window.excalidrawAPI) return;
+  if (!document.hasFocus()) return;
+
+  if (!setSavingBegin(eventName === 'save')) return;
+
+  if (eventName === 'save') triggleToast('saving');
+
+  let blob : Blob | null = null;
+  if (eventName === 'save') {
+    blob = await renderImageContentWithMetadataAndImage();
+  } else {
+    blob = await renderImageContentWithOnlyMetadata();
+  }
 
   // ========== 第三步：保存 ==========
-  if (!document.hasFocus()) return; // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
+  if (!document.hasFocus()) {
+    // 当窗口未聚焦时，直接放弃保存，避免窗口里的iframe抖动导致渲染为空白
+    setSavingEnd();
+    if (eventName === 'save') triggleToast('savecancel');
+    return;
+  }
 
-  const blob = dataURLToBlob(imageDataURL);
   const file = new File([blob], imageURL.split('/').pop()!, { type: blob.type });
   const formData = new FormData();
   formData.append("path", 'data/' + imageURL);
@@ -242,10 +392,10 @@ const save = async (eventName: 'save' | 'autosave') => {
     postMessage({
       event: eventName,
       imageURL: imageURL,
-      data: imageDataURL,
     });
   });
 
+  setSavingEnd();
   if (eventName === 'save') triggleToast('savedone');
 }
 
@@ -280,19 +430,25 @@ const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | R
 
 const App = (props: { initialData: any }) => {
   // 300ms 内没有修改才保存
-  let lastSaveTime = 0;
-  const debouncedSave = React.useCallback(
-    debounce(() => {
-      let currentTime = Date.now();
-      if (currentTime - lastSaveTime > autoSaveInterval) {
-        lastSaveTime = currentTime;
-        save("autosave");
-      }
-    }, 300),
-    []
-  );
+  let lastAutoSaveTime = 0;
+  const debouncedAutoSave = debounce(() => {
+    let currentTime = Date.now();
+    if (!saveStatus.saving && currentTime - lastAutoSaveTime > autoSaveInterval) {
+      lastAutoSaveTime = currentTime;
+      save("autosave");
+      lastAutoSaveTime = Date.now();
+    }
+  }, 300);
+
+  // 3s 没有修改才完整保存
+  const debouncedSave = debounce(() => {
+    if (!saveStatus.complete && !saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) {
+      save("save");
+    }
+  }, 3000);
 
   let changeInitStatus = true;
+  let lastVersionNonceSum = 0;
   const handleChange = async (elements: readonly any[], state: any) => {
     if (changeInitStatus) {
       // 忽略初始化导致的第一次变化
@@ -301,9 +457,16 @@ const App = (props: { initialData: any }) => {
     }
     if (!window.excalidrawAPI) return;
 
-    // 只有启用自动保存时才执行防抖保存
-    if (enableAutoSave) {
-      debouncedSave();
+    const versionNonceSum = window.excalidrawAPI.getSceneElements().reduce((sum: number, element: any) => sum + element.versionNonce, 0);
+    if (versionNonceSum !== lastVersionNonceSum) {
+      lastVersionNonceSum = versionNonceSum;
+      saveStatus.complete = false;
+
+      // 只有启用自动保存时才执行防抖保存
+      if (enableAutoSave) {
+        debouncedAutoSave();
+        debouncedSave();
+      }
     }
   };
 
@@ -385,6 +548,15 @@ const load = async () => {
 
   const blob = await response.blob();
   mimeType = blob.type;
+
+  if (mimeType === 'image/svg+xml') {
+    const dataURL = await blobToDataURL(blob);
+    savedSvg = HTMLToElement(base64ToUnicode(dataURL.split(',')[1]));
+    defaultSvg = HTMLToElement(base64ToUnicode(defaultImageContent['svg'].split(',')[1]));
+  } else {
+    savedPngBinaryArray = await blobToArray(blob);
+    defaultPngBinaryArray = base64ToArray(defaultImageContent['png'].split(',')[1]);
+  }
 
   const contents = await loadFromBlob(blob, null, null);
   contents.appState.theme = urlParams.get('dark') == '1' ? 'dark' : 'light';
@@ -510,6 +682,7 @@ const getMarkdownToolButton = () => {
           config: {
           },
         },
+        iframeVersionNonce: Math.floor(Math.random() * 10000),
       },
     };
 
@@ -582,6 +755,6 @@ if (libraryUrlTokens) {
 window.addEventListener('keydown', (event: KeyboardEvent) => {
   if (matchHotKey('⌘S', event)) {
     event.preventDefault();
-    save("save");
+    if (!saveStatus.saving) save("save");
   }
 });

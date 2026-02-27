@@ -121,8 +121,29 @@ export async function blobToDataURL(blob: Blob): Promise<string> {
 }
 
 export async function blobToArray(blob: Blob): Promise<Uint8Array> {
-  const arrayBuffer = await blob.arrayBuffer();
-  return new Uint8Array(arrayBuffer);
+  if (typeof blob.arrayBuffer === "function") {
+    const arrayBuffer = await blob.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+export async function blobToBuffer(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === "function") {
+    const arrayBuffer = await blob.arrayBuffer();
+    return arrayBuffer;
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(blob);
+  });
 }
 
 export function mimeTypeToFormat(mime: string): string {
@@ -146,30 +167,7 @@ export function mimeTypeOfDataURL(dataURL: string): string {
   return mime || '';
 }
 
-function getPNGSizeFromBase64(dataUrl: string): { width: number, height: number } | null {
-  // 1. 检查是否是 PNG Data URL
-  if (!dataUrl.startsWith('data:image/png;base64,')) {
-    console.warn('Not a PNG data URL');
-    return null;
-  }
-
-  // 2. 提取 base64 部分并解码为 Uint8Array
-  const base64 = dataUrl.split(',')[1];
-  if (!base64) return null;
-
-  let binaryString: string;
-  try {
-    binaryString = atob(base64);
-  } catch (e) {
-    console.warn('Invalid base64 string');
-    return null;
-  }
-
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
+export function getPNGSize(bytes: Uint8Array): { width: number, height: number } | null {
   // 3. 检查 PNG 签名（前8字节）
   const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   for (let i = 0; i < 8; i++) {
@@ -219,26 +217,7 @@ function getPNGSizeFromBase64(dataUrl: string): { width: number, height: number 
   };
 }
 
-function getSVGSizeFromBase64(dataUrl: string): { width: number, height: number } | null { 
-  if (!dataUrl.startsWith('data:image/svg+xml;base64,')) {
-    console.warn('Not a SVG data URL');
-    return null;
-  }
-
-  const base64 = dataUrl.split(',')[1];
-  if (!base64) return null;
-
-  let xmlStr: string;
-  try {
-    xmlStr = atob(base64);
-  } catch {
-    return null;
-  }
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlStr, 'image/svg+xml');
-  const svg = doc.documentElement;
-
+export function getSVGSize(svg: HTMLElement): { width: number, height: number } | null { 
   if (svg.tagName.toLowerCase() !== 'svg') return null;
 
   // Try getBoundingClientRect-like intrinsic size
@@ -267,16 +246,6 @@ function getSVGSizeFromBase64(dataUrl: string): { width: number, height: number 
   }
 
   return w != null && h != null && w > 0 && h > 0 ? { width: w, height: h } : null;
-}
-
-export function getImageSizeFromBase64(dataUrl: string): { width: number, height: number } | null {
-  if (dataUrl.startsWith('data:image/png;base64,')) {
-    return getPNGSizeFromBase64(dataUrl);
-  }
-  else if (dataUrl.startsWith('data:image/svg+xml;base64,')) {
-    return getSVGSizeFromBase64(dataUrl);
-  }
-  return null;
 }
 
 export function base64ToArray(base64: string): Uint8Array {

@@ -10,7 +10,6 @@ const elementId = urlParams.get('elementId');
 
 let vditor: Vditor | null = null;
 let currentMarkdownData: MarkdownData | null = null;
-let isInitialized = false;
 
 /**
  * 初始化 Vditor 编辑器
@@ -67,7 +66,7 @@ function initVditor(markdownData: MarkdownData) {
 
     // 缓存配置
     cache: {
-      enable: true,
+      enable: false, // 必须禁止以避免多个markdown编辑器间通过localstorage共享初始数据
     },
 
     // 输入回调 - 直接更新父页面数据
@@ -80,14 +79,10 @@ function initVditor(markdownData: MarkdownData) {
 
     // 初始化完成回调
     after: () => {
-      isInitialized = true;
-
       // 设置初始内容
       if (vditor && currentMarkdownData?.content) {
         vditor.setValue(currentMarkdownData.content);
       }
-
-      console.log('Markdown editor initialized');
     },
   });
 }
@@ -113,6 +108,8 @@ function loadData(): boolean {
 }
 
 // 直接从父页面获取数据并初始化
+console.log("init Vditor start", elementId);
+console.time(`init Vditor ${elementId}`);
 if (!loadData()) {
   // 没有 elementId，显示错误信息
   document.getElementById('root')!.innerHTML = `
@@ -124,6 +121,8 @@ if (!loadData()) {
     </div>
   `;
 }
+console.log("init Vditor end", elementId);
+console.timeEnd(`init Vditor ${elementId}`);
 
 // 页面卸载时清理
 window.addEventListener('unload', () => {
