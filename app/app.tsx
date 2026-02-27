@@ -68,15 +68,15 @@ const getEmbeddableLink = (element: any): string => {
 
   const link = element?.link || '';
 
+  // 处理 Markdown 链接 (通过检查 customData.markdown 是否存在)
+  if (element?.type === "embeddable" && element?.customData?.markdown) {
+    return `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${element.id}`;
+  }
+
   // 处理思源块链接
   if (link?.startsWith('siyuan://blocks/')) {
     const blockID = link.split('siyuan://blocks/')[1];
     return `/plugins/siyuan-embed-excalidraw/embed/siyuan?id=${blockID}`;
-  }
-
-  // 处理 Markdown 链接 (通过检查 customData.markdown 是否存在)
-  if (element?.type === "embeddable" && element?.customData?.markdown) {
-    return `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${element.id}`;
   }
 
   return link;
