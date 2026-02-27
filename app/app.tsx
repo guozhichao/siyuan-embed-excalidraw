@@ -44,6 +44,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
 const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
 const autoSaveInterval = Math.max(parseInt(urlParams.get('autoSaveInterval') || '0') * 1000, 300);
+const completeSaveDelay = Math.max(parseInt(urlParams.get('completeSaveDelay') || '0') * 1000, 5000);
 let saveStatus = {
   complete: true,
   saving: false, 
@@ -440,12 +441,12 @@ const App = (props: { initialData: any }) => {
     }
   }, 300);
 
-  // 3s 没有修改才完整保存
+  // 一段时间没有修改才完整保存
   const debouncedSave = debounce(() => {
     if (!saveStatus.complete && !saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) {
       save("save");
     }
-  }, 3000);
+  }, completeSaveDelay);
 
   let changeInitStatus = true;
   let lastVersionNonceSum = 0;
