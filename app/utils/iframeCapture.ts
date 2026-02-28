@@ -7,7 +7,7 @@ import { processArraySequentially } from '../../src/utils/task';
  */
 export function needsIframeCapture(element: any): boolean {
   // Markdown 元素
-  if (element?.customData?.markdown) return true;
+  if (element?.customData?.embedMarkdown) return true;
   
   // 思源块嵌入
   if (element?.link?.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) return true;
@@ -19,19 +19,19 @@ export function needsIframeCapture(element: any): boolean {
  * 获取 iframe 元素
  */
 export function getIframeForElement(element: any): HTMLIFrameElement | null {
-  if (element?.customData?.markdown) {
+  if (element?.customData?.embedMarkdown) {
     return document.querySelector(
       `iframe.excalidraw__embeddable[src*="/embed/markdown/?elementId=${element.id}"]`
     ) as HTMLIFrameElement;
   }
-  
+
   if (element?.link?.includes('/embed/siyuan')) {
     const blockId = element.link.split('id=')[1];
     return document.querySelector(
       `iframe.excalidraw__embeddable[src*="/embed/siyuan?id=${blockId}"]`
     ) as HTMLIFrameElement;
   }
-  
+
   return null;
 }
 
@@ -56,7 +56,7 @@ export async function captureIframe(
   }
 }
 
-const iframeCache = new Map<string, {iframeVersionNonce: number, width: number, height: number, content: string}>();
+const iframeCache = new Map<string, {embedIframeVersionNonce: number, width: number, height: number, content: string}>();
 
 /**
  * 为所有需要处理的元素捕获 iframe
@@ -73,7 +73,7 @@ export async function captureAllIframes(
     if (!iframe) return;
 
     const cache = iframeCache.get(element.id);
-    if (cache && cache.iframeVersionNonce === element.customData?.iframeVersionNonce && cache.width === element.width && cache.height === element.height) {
+    if (cache && cache.embedIframeVersionNonce === element.customData?.embedIframeVersionNonce && cache.width === element.width && cache.height === element.height) {
       iframeMap.set(element.id, cache.content);
       return;
     }
@@ -91,7 +91,7 @@ export async function captureAllIframes(
     if (svgContent) {
       iframeMap.set(element.id, svgContent);
       iframeCache.set(element.id, {
-        iframeVersionNonce: element.customData?.iframeVersionNonce,
+        embedIframeVersionNonce: element.customData?.embedIframeVersionNonce,
         width: element.width,
         height: element.height,
         content: svgContent,
@@ -115,7 +115,7 @@ export function createImageFile(
   svgDataURL: string
 ): { fileId: string; file: any } {
   const fileId = `file-${elementId}-${Date.now()}`;
-  
+
   return {
     fileId,
     file: {

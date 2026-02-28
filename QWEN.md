@@ -164,7 +164,7 @@ cp .env.example .env
 - `replaceIframesWithImages()`: 将 iframe 元素替换为图像
 
 **缓存机制**:
-- 使用 `iframeVersionNonce` 判断 iframe 内容是否变化
+- 使用 `embedIframeVersionNonce` 判断 iframe 内容是否变化
 - 避免重复捕获，提升性能
 
 ### 4. 思源块嵌入 (embed/siyuan/index.ts)
@@ -196,7 +196,7 @@ cp .env.example .env
 
 **数据结构**:
 ```typescript
-// 存储在 Excalidraw embeddable 元素的 customData.markdown 中
+// 存储在 Excalidraw embeddable 元素的 customData.embedMarkdown 中
 interface MarkdownData {
   content: string;                        // Markdown 内容
   config: MarkdownConfig;                 // 编辑器配置
@@ -210,15 +210,15 @@ interface MarkdownData {
 
 **判断方式**:
 ```typescript
-// 判断是否为 Markdown 元素：检查 customData.markdown 是否存在
-if (element?.customData?.markdown) {
+// 判断是否为 Markdown 元素：检查 customData.embedMarkdown 是否存在
+if (element?.customData?.embedMarkdown) {
   // 这是 Markdown 元素
 }
 ```
 
 **更新机制**:
 - 输入防抖 300ms
-- 更新时同步更新 `iframeVersionNonce` 触发重新捕获
+- 更新时同步更新 `embedIframeVersionNonce` 触发重新捕获
 - 更新元素版本号和更新时间
 
 ### 6. 工具函数 (src/utils/index.ts)
@@ -296,11 +296,11 @@ if (element?.customData?.markdown) {
 
 ### Markdown 编辑流程
 1. 用户在 Excalidraw 中点击"嵌入网页"，输入 Markdown 元素
-2. Excalidraw 创建 embeddable 元素，设置 `customData.markdown`
+2. Excalidraw 创建 embeddable 元素，设置 `customData.embedMarkdown`
 3. `embed/markdown` 通过 `getElementData()` 从父页面获取数据
 4. 初始化 Vditor 编辑器
 5. 用户输入内容，防抖后调用 `updateElementData()` 更新
-6. 更新触发 `iframeVersionNonce` 变化
+6. 更新触发 `embedIframeVersionNonce` 变化
 7. 保存时 `captureAllIframes()` 检测到变化，重新捕获 iframe
 
 ## 注意事项

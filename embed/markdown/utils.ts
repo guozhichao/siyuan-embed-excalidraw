@@ -24,11 +24,11 @@ export function getParentExcalidrawAPI(): any {
 export function getElementData(elementId: string): MarkdownData | null {
   const api = getParentExcalidrawAPI();
   if (!api) return null;
-  
+
   try {
     const element = api.getSceneElements().find((el : any) => el.id === elementId);
-    if (element && element.customData?.markdown) {
-      return element.customData.markdown as MarkdownData;
+    if (element && element.customData?.embedMarkdown) {
+      return element.customData.embedMarkdown as MarkdownData;
     }
   } catch (error) {
     console.error('Failed to get element data:', error);
@@ -42,12 +42,12 @@ export function getElementData(elementId: string): MarkdownData | null {
 export function updateElementData(elementId: string, markdownData: MarkdownData): void {
   const api = getParentExcalidrawAPI();
   if (!api) return;
-  
+
   try {
     const elements = api.getSceneElements().map((element: any) => {
       if (element.id === elementId) {
-        element.customData.markdown = markdownData;
-        element.customData.iframeVersionNonce = Math.floor(Math.random() * 10000);
+        element.customData.embedMarkdown = markdownData;
+        element.customData.embedIframeVersionNonce = Math.floor(Math.random() * 10000);
         element.version = element.version + 1;
         element.versionNonce = Math.floor(Math.random() * 10000);
         element.updated = Date.now();

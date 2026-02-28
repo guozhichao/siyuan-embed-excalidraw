@@ -68,8 +68,8 @@ const getEmbeddableLink = (element: any): string => {
 
   const link = element?.link || '';
 
-  // 处理 Markdown 链接 (通过检查 customData.markdown 是否存在)
-  if (element?.type === "embeddable" && element?.customData?.markdown) {
+  // 处理 Markdown 链接 (通过检查 customData.embedMarkdown 是否存在)
+  if (element?.type === "embeddable" && element?.customData?.embedMarkdown) {
     return `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${element.id}`;
   }
 
@@ -642,7 +642,7 @@ const getMarkdownToolButton = () => {
 </button>`.trim();
   const element = HTMLToElement(html);
   element.addEventListener('click', () => {
-    const elementID = nanoid();
+    const elementId = nanoid();
     const appState = window.excalidrawAPI.getAppState();
     const { x, y } = viewportCoordsToSceneCoords(
       { clientX: appState.width / 2, clientY: appState.height / 2 },
@@ -651,7 +651,7 @@ const getMarkdownToolButton = () => {
 
     // 创建 Markdown embeddable 元素
     const newElement = {
-      id: elementID,
+      id: elementId,
       type: 'embeddable',
       x,
       y,
@@ -678,12 +678,12 @@ const getMarkdownToolButton = () => {
       link: `markdown`,
       locked: false,
       customData: {
-        markdown: {
+        embedMarkdown: {
           content: '',
           config: {
           },
         },
-        iframeVersionNonce: Math.floor(Math.random() * 10000),
+        embedIframeVersionNonce: Math.floor(Math.random() * 10000),
       },
     };
 
