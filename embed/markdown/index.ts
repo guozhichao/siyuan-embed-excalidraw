@@ -53,7 +53,6 @@ function initVditor(markdownData: MarkdownData) {
       'edit-mode',
       'content-theme',
       'code-theme',
-      'export',
       '|',
       'both',
       'reset',
@@ -108,8 +107,6 @@ function loadData(): boolean {
 }
 
 // 直接从父页面获取数据并初始化
-console.log("init Vditor start", elementId);
-console.time(`init Vditor ${elementId}`);
 if (!loadData()) {
   // 没有 elementId，显示错误信息
   document.getElementById('root')!.innerHTML = `
@@ -121,8 +118,6 @@ if (!loadData()) {
     </div>
   `;
 }
-console.log("init Vditor end", elementId);
-console.timeEnd(`init Vditor ${elementId}`);
 
 // 页面卸载时清理
 window.addEventListener('unload', () => {

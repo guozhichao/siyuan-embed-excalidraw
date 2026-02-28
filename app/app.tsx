@@ -33,6 +33,8 @@ import defaultImageContent from "../src/default.json";
 import { nanoid } from "nanoid";
 import {
   captureAllIframes,
+  getIframeCacheMap,
+  putIframeCacheMap,
   replaceIframesWithImages,
 } from './utils/iframeCapture';
 
@@ -44,20 +46,21 @@ const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
 const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
 const autoSaveInterval = Math.max(parseInt(urlParams.get('autoSaveInterval') || '0') * 1000, 300);
-const completeSaveDelay = Math.max(parseInt(urlParams.get('completeSaveDelay') || '0') * 1000, 5000);
+const fullSaveDelay = Math.max(parseInt(urlParams.get('fullSaveDelay') || '0') * 1000, 5000);
 let saveStatus = {
-  complete: true,
-  saving: false, 
+  fullSave: true,
+  saving: false,
 };
-let saveTimer : ReturnType<typeof setTimeout> | null = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const saveTimeout = 10_000;
 let mimeType = 'image/svg+xml';
 let imageURL = '';
 const exportPadding = 10;
-let savedSvg : HTMLElement | null = null;
-let savedPngBinaryArray : Uint8Array | null = null;
-let defaultSvg : HTMLElement | null = null;
-let defaultPngBinaryArray : Uint8Array | null = null;
+let savedSvg: HTMLElement | null = null;
+let savedPngBinaryArray: Uint8Array | null = null;
+let defaultSvg: HTMLElement | null = null;
+let defaultPngBinaryArray: Uint8Array | null = null;
+let iframeCacheMap = new Map<string, IframeCache>();
 
 const postMessage = (message: any) => {
   window.parent?.postMessage(JSON.stringify(message), '*');
@@ -145,7 +148,7 @@ const renderImageContentWithOnlyMetadata = async (): Promise<Blob> => {
   const files = window.excalidrawAPI.getFiles();
   const appState = window.excalidrawAPI.getAppState();
 
-  let blob : Blob | null = null;
+  let blob: Blob | null = null;
 
   if (mimeType === 'image/svg+xml') {
     // ===== SVG 分支 =====
@@ -175,7 +178,7 @@ const renderImageContentWithOnlyMetadata = async (): Promise<Blob> => {
     }
 
     savedSvg = fixSvgContent(savedSvg as HTMLElement);
-    
+
     // c. 转换为 dataURL
     blob = new Blob([savedSvg!.outerHTML], { type: 'image/svg+xml' });
   } else {
@@ -223,24 +226,21 @@ const renderImageContentWithOnlyMetadata = async (): Promise<Blob> => {
 }
 
 const renderImageContentWithMetadataAndImage = async (): Promise<Blob> => {
-  const elements = window.excalidrawAPI.getSceneElements();
+  let elements = window.excalidrawAPI.getSceneElements();
   const files = window.excalidrawAPI.getFiles();
   const appState = window.excalidrawAPI.getAppState();
 
   // ========== 第一步：捕获所有 iframe，得到替换后的 elements ==========
-  const iframeSvgMap = await captureAllIframes(elements);
-  const { elements: processedElements, files: processedFiles } = replaceIframesWithImages(
-    elements,
-    iframeSvgMap,
-    files
-  );
+  iframeCacheMap = await captureAllIframes(elements, iframeCacheMap);
+  putIframeCacheMap(imageURL, iframeCacheMap);
+  const { elements: processedElements, files: processedFiles } = replaceIframesWithImages(elements, iframeCacheMap, files);
 
   // ========== 第二步：根据 mimeType 选择分支处理 ==========
   let blob: Blob | null = null;
 
   if (mimeType === 'image/svg+xml') {
     // ===== SVG 分支 =====
-    
+
     // a. 导出原始 SVG（包含完整 iframe 渲染）
     const originalSvg = await exportToSvg({
       elements: elements,
@@ -340,13 +340,13 @@ const renderImageContentWithMetadataAndImage = async (): Promise<Blob> => {
   return blob;
 }
 
-const setSavingBegin = (complete: boolean): boolean => {
+const setSavingBegin = (fullSave: boolean): boolean => {
   if (saveStatus.saving) return false;
   saveStatus.saving = true;
-  if (complete) saveStatus.complete = true;
+  if (fullSave) saveStatus.fullSave = true;
   // saveTimer = setTimeout(() => {
   //   saveStatus.saving = false;
-  //   if (complete) saveStatus.complete = false;
+  //   if (fullSave) saveStatus.fullSave = false;
   //   saveTimer = null;
   //   triggleToast("savetimeout");
   // }, saveTimeout);
@@ -365,10 +365,12 @@ const save = async (eventName: 'save' | 'autosave') => {
   if (!document.hasFocus()) return;
 
   if (!setSavingBegin(eventName === 'save')) return;
+  // console.log(`${eventName} start`);
+  // console.time(eventName);
 
   if (eventName === 'save') triggleToast('saving');
 
-  let blob : Blob | null = null;
+  let blob: Blob | null = null;
   if (eventName === 'save') {
     blob = await renderImageContentWithMetadataAndImage();
   } else {
@@ -398,6 +400,9 @@ const save = async (eventName: 'save' | 'autosave') => {
 
   setSavingEnd();
   if (eventName === 'save') triggleToast('savedone');
+
+  // console.log(`${eventName} end`);
+  // console.timeEnd(eventName);
 }
 
 const openLink = (element: any, event: CustomEvent<{ nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement>; }>) => {
@@ -443,10 +448,10 @@ const App = (props: { initialData: any }) => {
 
   // 一段时间没有修改才完整保存
   const debouncedSave = debounce(() => {
-    if (!saveStatus.complete && !saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) {
+    if (!saveStatus.fullSave && !saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) {
       save("save");
     }
-  }, completeSaveDelay);
+  }, fullSaveDelay);
 
   let changeInitStatus = true;
   let lastVersionNonceSum = 0;
@@ -461,7 +466,7 @@ const App = (props: { initialData: any }) => {
     const versionNonceSum = window.excalidrawAPI.getSceneElements().reduce((sum: number, element: any) => sum + element.versionNonce, 0);
     if (versionNonceSum !== lastVersionNonceSum) {
       lastVersionNonceSum = versionNonceSum;
-      saveStatus.complete = false;
+      saveStatus.fullSave = false;
 
       // 只有启用自动保存时才执行防抖保存
       if (enableAutoSave) {
@@ -559,6 +564,8 @@ const load = async () => {
     defaultPngBinaryArray = base64ToArray(defaultImageContent['png'].split(',')[1]);
   }
 
+  iframeCacheMap = await getIframeCacheMap(imageURL);
+
   const contents = await loadFromBlob(blob, null, null);
   contents.appState.theme = urlParams.get('dark') == '1' ? 'dark' : 'light';
   createRoot(document.getElementById('root')!).render(React.createElement(App, {
@@ -596,7 +603,7 @@ const loadLibary = async () => {
   try {
     const blob = await response.blob();
     libraryItems = await loadLibraryFromBlob(blob);
-  } catch (error) {}
+  } catch (error) { }
   return libraryItems;
 }
 

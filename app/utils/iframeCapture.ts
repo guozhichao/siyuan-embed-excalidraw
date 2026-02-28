@@ -8,10 +8,10 @@ import { processArraySequentially } from '../../src/utils/task';
 export function needsIframeCapture(element: any): boolean {
   // Markdown 元素
   if (element?.customData?.embedMarkdown) return true;
-  
+
   // 思源块嵌入
   if (element?.link?.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) return true;
-  
+
   return false;
 }
 
@@ -43,41 +43,51 @@ export async function captureIframe(
 ): Promise<string | null> {
   try {
     if (!iframe.contentDocument?.body) return null;
-    const svg = await snapdom.toSvg(iframe.contentDocument.body, {
+    const img = await snapdom.toSvg(iframe.contentDocument.body, {
       width: iframe.clientWidth,
       height: iframe.clientHeight,
       scale: 1,
       embedFonts: true,
     });
-    return svg.src;
+    return img.src;
   } catch (error) {
     console.error('Failed to capture iframe:', error);
     return null;
   }
 }
 
-const iframeCache = new Map<string, {embedIframeVersionNonce: number, width: number, height: number, content: string}>();
-
 /**
  * 为所有需要处理的元素捕获 iframe
  */
 export async function captureAllIframes(
-  elements: any[]
-): Promise<Map<string, string>> {
-  const iframeMap = new Map<string, string>();
-  
+  elements: any[],
+  iframeCacheMap: Map<string, IframeCache>,
+): Promise<Map<string, IframeCache>> {
   const elementsToCapture = elements.filter(needsIframeCapture);
+  const newIframeCacheMap = new Map<string, IframeCache>();
 
   const captureElement = async (element: any) => {
+    let cache = iframeCacheMap.get(element.id);
+    if (cache
+      && cache.dataURL
+      && cache.embedIframeVersionNonce === element.customData.embedIframeVersionNonce
+      && cache.width === element.width
+      && cache.height === element.height
+    ) {
+      newIframeCacheMap.set(element.id, cache);
+      return;
+    }
+    cache = {
+      dataURL: null,
+      embedIframeVersionNonce: element.customData?.embedIframeVersionNonce || Math.floor(Math.random() * 10000),
+      width: element.width,
+      height: element.height,
+    } as IframeCache;
+    newIframeCacheMap.set(element.id, cache);
+
     const iframe = getIframeForElement(element);
     if (!iframe) return;
 
-    const cache = iframeCache.get(element.id);
-    if (cache && cache.embedIframeVersionNonce === element.customData?.embedIframeVersionNonce && cache.width === element.width && cache.height === element.height) {
-      iframeMap.set(element.id, cache.content);
-      return;
-    }
-    
     // 等待 iframe 加载
     await new Promise<void>((resolve) => {
       if (iframe.contentDocument?.readyState === 'complete') {
@@ -86,25 +96,17 @@ export async function captureAllIframes(
         iframe.addEventListener('load', () => resolve(), { once: true });
       }
     });
-    
-    const svgContent = await captureIframe(iframe);
-    if (svgContent) {
-      iframeMap.set(element.id, svgContent);
-      iframeCache.set(element.id, {
-        embedIframeVersionNonce: element.customData?.embedIframeVersionNonce,
-        width: element.width,
-        height: element.height,
-        content: svgContent,
-      });
-    }
+
+    cache.dataURL = await captureIframe(iframe);
+    newIframeCacheMap.set(element.id, cache);
   };
 
   // elementsToCapture.forEach(captureElement);
   // await Promise.all(elementsToCapture.map(captureElement));
   // await idleTimeSlice(elementsToCapture, captureElement, { chunkTimeout: 500, globalTimeout: 10000 });
   await processArraySequentially(elementsToCapture, captureElement);
-  
-  return iframeMap;
+
+  return newIframeCacheMap;
 }
 
 /**
@@ -133,58 +135,110 @@ export function createImageFile(
  */
 export function replaceIframesWithImages(
   elements: any[],
-  iframeSvgMap: Map<string, string>,
+  iframeCacheMap: Map<string, IframeCache>,
   files: any
 ): { elements: any[]; files: any } {
-  const newFiles : any = {};
-  
+  const newFiles: any = {};
+
   // 使用 flatMap 将每个元素映射为 1 个或 2 个元素
-  const processedElements = elements.flatMap((el) => {    
-    const svgDataURL = iframeSvgMap.get(el.id);
-    if (!svgDataURL) {
-      return [el]; // 没有捕获到 iframe，保持原样
+  const processedElements = elements.flatMap((element) => {
+    const cache = iframeCacheMap.get(element.id);
+    if (!(cache?.dataURL)) {
+      return [element]; // 没有捕获到 iframe，保持原样
     }
-    
-    const { fileId, file } = createImageFile(el.id, svgDataURL);
+
+    const { fileId, file } = createImageFile(element.id, cache.dataURL);
     newFiles[fileId] = file;
-    
+
     // 返回两个元素：矩形背景 + SVG 图像
     return [
       {
         // 矩形背景元素
-        id: `${el.id}-rect`,
+        id: `${element.id}-rect`,
         type: 'rectangle',
-        x: el.x,
-        y: el.y,
-        width: el.width,
-        height: el.height,
-        angle: el.angle,
-        strokeColor: el.strokeColor,
-        backgroundColor: el.backgroundColor,
-        fillStyle: el.fillStyle,
-        strokeWidth: el.strokeWidth,
-        strokeStyle: el.strokeStyle,
-        roundness: el.roundness,
-        opacity: el.opacity,
-        groupIds: el.groupIds,
-        frameId: el.frameId,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        angle: element.angle,
+        strokeColor: element.strokeColor,
+        backgroundColor: element.backgroundColor,
+        fillStyle: element.fillStyle,
+        strokeWidth: element.strokeWidth,
+        strokeStyle: element.strokeStyle,
+        roundness: element.roundness,
+        opacity: element.opacity,
+        groupIds: element.groupIds,
+        frameId: element.frameId,
       },
       {
         // SVG 图像元素
-        id: `${el.id}-image`,
+        id: `${element.id}-image`,
         type: 'image',
-        x: el.x,
-        y: el.y,
-        width: el.width,
-        height: el.height,
-        angle: el.angle,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        angle: element.angle,
         fileId: fileId,
-        opacity: el.opacity,
-        groupIds: el.groupIds,
-        frameId: el.frameId,
+        opacity: element.opacity,
+        groupIds: element.groupIds,
+        frameId: element.frameId,
+        roundness: element.roundness,
       },
     ];
   });
-  
-  return { elements: processedElements, files: { ...files, ...newFiles} };
+
+  return { elements: processedElements, files: { ...files, ...newFiles } };
+}
+
+export async function computeHash(str: string): Promise<string> {
+  // 1. 将字符串编码为 Uint8Array
+  const msgBuffer = new TextEncoder().encode(str);
+
+  // 2. 计算哈希 (返回 ArrayBuffer)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+
+  // 3. 将 ArrayBuffer 转换为十六进制字符串
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return hashHex;
+}
+
+const CACHE_VERSION = 1;
+export async function putIframeCacheMap(imageURL: string, iframeCacheMap: Map<string, IframeCache>) {
+  const imageHash = await computeHash(imageURL);
+  const cacheData = {
+    cacheVersion: CACHE_VERSION,
+    imageURL: imageURL,
+    iframeCacheData: Object.fromEntries(iframeCacheMap),
+  }
+  const iframeCacheData = JSON.stringify(cacheData);
+  const file = new File([iframeCacheData], `cache-${imageHash}.json`, { type: 'application/json' });
+  const formData = new FormData();
+  formData.append('path', `/temp/siyuan-embed-excalidraw/cache/cache-${imageHash}.json`);
+  formData.append('file', file);
+  formData.append('isDir', 'false');
+  await fetch('/api/file/putFile', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function getIframeCacheMap(imageURL: string): Promise<Map<string, IframeCache>> {
+  const imageHash = await computeHash(imageURL);
+  const response = await fetch('/api/file/getFile', {
+    method: 'POST',
+    body: JSON.stringify({
+      path: `/temp/siyuan-embed-excalidraw/cache/cache-${imageHash}.json`,
+    }),
+  });
+  if (response.ok && response.status === 200) {
+    const iframeCacheData = await response.json();
+    if (iframeCacheData.cacheVersion === CACHE_VERSION && iframeCacheData.iframeCacheData) {
+      return new Map<string, IframeCache>(Object.entries(iframeCacheData.iframeCacheData));
+    }
+  }
+  return new Map<string, IframeCache>();
 }
