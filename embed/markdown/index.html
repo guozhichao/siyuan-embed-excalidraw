@@ -26,6 +26,11 @@
     pre.vditor-reset {
       overflow: hidden;
     }
+    /* 加!important渲染为SVG时无法起作用，暂时先解决白板内的显示问题 */
+    .language-abc,
+    .hljs {
+      overflow: hidden !important;
+    }
   </style>
 </head>
 <body>
