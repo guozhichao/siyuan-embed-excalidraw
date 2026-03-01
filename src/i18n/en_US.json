@@ -17,7 +17,9 @@
   "snippets": "Snippets",
   "snippetsDescription": "Make SiYuan snippets available at Excalidraw",
   "enableAutoSave": "Enable Auto Save",
-  "enableAutoSaveDescription": "Automatically save content during editing (hint: no auto save when closing)",
+  "enableAutoSaveDescription": "Automatically save content during editing",
   "autoSaveInterval": "Auto Save Interval",
-  "autoSaveIntervalDescription": "Interval between auto saves, in seconds (0 to auto save at any change)"
+  "autoSaveIntervalDescription": "Interval between auto saves, in seconds (0 to auto save at any change)",
+  "fullSaveDelay": "Full Save Delay",
+  "fullSaveDelayDescription": "If there is no modification for a certain period of time (in seconds), save the file completely."
 }
