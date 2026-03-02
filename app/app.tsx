@@ -727,9 +727,13 @@ const setupMutationObserver = () => {
                 postMessage({ event: 'browseLibrary' });
               });
             });
-            const lastTool = addedElement.querySelector(".dropdown-menu-item[data-testid='toolbar-laser']");
-            if (lastTool) {
-              lastTool.insertAdjacentElement('afterend', getMarkdownToolButton());
+            const embeddableTool = addedElement.querySelector(".dropdown-menu-item[data-testid='toolbar-embeddable']");
+            if (embeddableTool) {
+              const embeddableToolText = embeddableTool.querySelector('.dropdown-menu-item__text');
+              if (embeddableToolText) {
+                embeddableToolText.textContent = embeddableToolText.textContent + (langCode.startsWith('zh') ? '/思源超链接' : '/SiYuan Hyperlink');
+              }
+              embeddableTool.insertAdjacentElement('afterend', getMarkdownToolButton());
             }
           }
         });
