@@ -35,6 +35,7 @@ This plugin serves as the fourth plugin in the **Embed Series**, aiming to provi
 - [x] Edit in Tab/Dialog
 - [x] Custom Snippets
 - [x] Support SiYuan block in Excalidraw
+- [x] Markdown
 
 > If you have additional feature requests or suggestions, feel free to [open an issue on GitHub](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues) or [post in the SiYuan community](https://ld246.com/article/1763408501738) to request support for additional features.
 
@@ -81,6 +82,10 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v1.0.0
+    + Feature: Markdown
+    + Optimize: Redo the SiYuan block embedding function
+    + Optimize: Redesign save mechanism, greatly improve the smoothness of embedding SiYuan blocks/Markdown
 + v0.8.0
     + Feature: Set whether to enable auto save and auto save time interval
 + v0.7.8

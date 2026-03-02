@@ -49,6 +49,7 @@
 - [x] Tab/Dialog窗口编辑
 - [x] 自定义代码片段
 - [x] 支持Excalidraw中显示思源文档内容
+- [x] Markdown
 
 > 如有更多需求/建议欢迎[在GitHub仓库中提issue](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues)或[在思源笔记社区中发帖](https://ld246.com/article/1763408501738)
 
@@ -78,6 +79,10 @@
 
 ## 更新日志
 
++ v1.0.0
+    + 新增功能：Markdown
+    + 优化：重制思源块嵌入功能
+    + 优化：重构保存机制，大幅提升嵌入思源块/Markdown情况下的流畅度
 + v0.8.0
     + 新增功能：可设置是否启动自动保存和自动保存时间间隔
 + v0.7.8

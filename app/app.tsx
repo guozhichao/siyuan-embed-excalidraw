@@ -13,6 +13,7 @@ import {
   MainMenu,
   viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw';
+import { ClipboardData } from '@excalidraw/excalidraw/clipboard';
 import '@excalidraw/excalidraw/index.css';
 import './app.scss';
 import {
@@ -478,6 +479,10 @@ const App = (props: { initialData: any }) => {
     }
   };
 
+  const handlePaste = (data: ClipboardData, event: ClipboardEvent | null): boolean => {
+    return true;
+  }
+
   let libraryChangeInitStatus = true;
   const handleLibraryChange = async (libraryItems: any) => {
     if (libraryChangeInitStatus) {
@@ -500,6 +505,7 @@ const App = (props: { initialData: any }) => {
       initialData={props.initialData}
       langCode={langCode}
       onChange={handleChange}
+      onPaste={handlePaste}
       onLibraryChange={handleLibraryChange}
       excalidrawAPI={setExcalidrawAPI}
       validateEmbeddable={true}
