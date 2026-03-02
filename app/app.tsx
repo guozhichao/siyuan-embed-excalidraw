@@ -705,6 +705,16 @@ const getMarkdownToolButton = () => {
   return element;
 }
 
+window.triggleHoverBlock = (blockId: string, location: { x: number, y: number }) => {
+  const frameRect = window.frameElement!.getBoundingClientRect();
+  postMessage({
+    event: 'triggleHoverBlock',
+    blockID: blockId,
+    x: frameRect.left + location.x,
+    y: frameRect.top + location.y,
+  });
+}
+
 const setupMutationObserver = () => {
   const mutationObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
@@ -733,14 +743,10 @@ const setupMutationObserver = () => {
         ) {
           const tooltip = mutation.target as HTMLElement;
           const rect = tooltip.getBoundingClientRect();
-          const frameRect = window.frameElement.getBoundingClientRect();
-          const blockID = mutation.target.textContent.split('siyuan://blocks/').pop();
-          postMessage({
-            event: 'triggleHoverBlock',
-            blockID: blockID,
-            x: frameRect.left + rect.left,
-            y: frameRect.top + rect.top,
-          });
+          const blockId = tooltip.textContent.split('siyuan://blocks/').pop();
+          if (blockId) {
+            window.triggleHoverBlock(blockId, {x: rect.left, y: rect.top});
+          }
         }
       }
     }
@@ -767,6 +773,6 @@ if (libraryUrlTokens) {
 window.addEventListener('keydown', (event: KeyboardEvent) => {
   if (matchHotKey('⌘S', event)) {
     event.preventDefault();
-    if (!saveStatus.saving) save("save");
+    if (!saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) save("save");
   }
 });

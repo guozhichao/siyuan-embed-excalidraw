@@ -1,7 +1,7 @@
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import type { SiyuanBlockData } from './types';
-import { getElementData, updateElementData } from './utils';
+import { getElementData, getParentWindow, updateElementData } from './utils';
 
 // 获取 URL 参数
 const urlParams = new URLSearchParams(window.location.search);
@@ -47,19 +47,19 @@ function setupButtonVisibility(): void {
 
   // 鼠标移入 iframe 时显示按钮
   document.addEventListener('mouseenter', () => {
-    buttonContainer.style.display = 'block';
+    buttonContainer.classList.toggle('button-visible', true);
   });
 
   // 鼠标移出 iframe 时隐藏按钮
   document.addEventListener('mouseleave', () => {
-    buttonContainer.style.display = 'none';
+    buttonContainer.classList.toggle('button-visible', false);
   });
 }
 
 /**
  * 更新按钮功能 - 重新获取 Markdown 数据并在内容变化时更新
  */
-async function handleUpdate(): Promise<void> {
+const handleUpdate = async (): Promise<void> => {
   if (!elementId || !blockId) return;
 
   const newBlockData = await getElementData(elementId, blockId);
@@ -86,9 +86,10 @@ async function handleUpdate(): Promise<void> {
 /**
  * 编辑按钮功能
  */
-function handleEdit(): void {
-  // TODO: 实现编辑功能
-  console.log('Edit button clicked - TODO: implement edit functionality');
+const handleEdit = (): void => {
+  if (blockId) {
+    getParentWindow()?.triggleHoverBlock(blockId, window.frameElement!.getBoundingClientRect())
+  }
 }
 
 /**

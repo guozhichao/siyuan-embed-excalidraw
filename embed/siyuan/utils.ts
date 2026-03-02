@@ -53,8 +53,8 @@ export async function getElementData(elementId: string, blockId: string): Promis
           if (!element.customData) element.customData = {}
           element.customData.embedSiyuan = data;
           element.customData.embedIframeVersionNonce =  Math.floor(Math.random() * 10000);
-          return element;
         }
+        return element;
       })
       api.updateScene({ elements: elements });
     }
@@ -75,6 +75,7 @@ export function updateElementData(elementId: string, blockData: SiyuanBlockData)
     if (element.id === elementId) {
       if (!element.customData) element.customData = {};
       element.customData.embedIframeVersionNonce = Math.floor(Math.random() * 10000);
+      element.customData.embedSiyuan = blockData;
       element.version = element.version + 1;
       element.versionNonce = Math.floor(Math.random() * 10000);
       element.updated = Date.now();
