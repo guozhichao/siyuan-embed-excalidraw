@@ -21,5 +21,5 @@
   "autoSaveInterval": "Auto Save Interval",
   "autoSaveIntervalDescription": "Interval between auto saves, in seconds (0 to auto save at any change)",
   "fullSaveDelay": "Full Save Delay",
-  "fullSaveDelayDescription": "If there is no modification for a certain period of time (in seconds), save the file completely."
+  "fullSaveDelayDescription": "If there is no modification for a certain period of time (in seconds), save the file completely"
 }

@@ -7,10 +7,10 @@ import { processArraySequentially } from '../../src/utils/task';
  */
 export function needsIframeCapture(element: any): boolean {
   // Markdown 元素
-  if (element?.customData?.embedMarkdown) return true;
+  if (element?.type === "embeddable" && element?.customData?.embedMarkdown) return true;
 
-  // 思源块嵌入
-  if (element?.link?.startsWith('/plugins/siyuan-embed-excalidraw/embed/siyuan')) return true;
+  // 思源块嵌入（通过 link 判断）
+  if (element?.type === "embeddable" && element?.link?.startsWith('siyuan://blocks/')) return true;
 
   return false;
 }
@@ -19,16 +19,20 @@ export function needsIframeCapture(element: any): boolean {
  * 获取 iframe 元素
  */
 export function getIframeForElement(element: any): HTMLIFrameElement | null {
+  // Markdown 元素
   if (element?.customData?.embedMarkdown) {
+    const src = `/plugins/siyuan-embed-excalidraw/embed/markdown/?elementId=${element.id}`;
     return document.querySelector(
-      `iframe.excalidraw__embeddable[src*="/embed/markdown/?elementId=${element.id}"]`
+      `iframe.excalidraw__embeddable[src*="${src}"]`
     ) as HTMLIFrameElement;
   }
 
-  if (element?.link?.includes('/embed/siyuan')) {
-    const blockId = element.link.split('id=')[1];
+  // 思源块嵌入（通过 link 中的 blockId 查找）
+  if (element?.link?.startsWith('siyuan://blocks/')) {
+    const blockId = element.link.split('siyuan://blocks/')[1];
+    const src = `/plugins/siyuan-embed-excalidraw/embed/siyuan/?elementId=${element.id}&blockId=${blockId}`;
     return document.querySelector(
-      `iframe.excalidraw__embeddable[src*="/embed/siyuan?id=${blockId}"]`
+      `iframe.excalidraw__embeddable[src*="${src}"]`
     ) as HTMLIFrameElement;
   }
 
@@ -70,7 +74,7 @@ export async function captureAllIframes(
     let cache = iframeCacheMap.get(element.id);
     if (cache
       && cache.dataURL
-      && cache.embedIframeVersionNonce === element.customData.embedIframeVersionNonce
+      && cache.embedIframeVersionNonce === element.customData?.embedIframeVersionNonce
       && cache.width === element.width
       && cache.height === element.height
     ) {
