@@ -34,6 +34,7 @@ import { nanoid } from "nanoid";
 import {
   captureAllIframes,
   getIframeCacheMap,
+  needsIframeCapture,
   putIframeCacheMap,
   replaceIframesWithImages,
 } from './utils/iframeCapture';
@@ -91,12 +92,13 @@ const renderEmbeddable = (element: any, appState: any): React.JSX.Element | null
 
   return (
     <iframe
-      className="excalidraw__embeddable"
+      className={`excalidraw__embeddable`}
       src={src}
       referrerPolicy="no-referrer-when-downgrade"
       title="Excalidraw Embedded Content"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen={true}
+      style={needsIframeCapture(element) ? {filter: 'var(--theme-filter)'} : {}}
       sandbox={`allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads`}
     />
   )
