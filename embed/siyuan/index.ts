@@ -72,7 +72,6 @@ const handleUpdate = async (): Promise<void> => {
   // 判断内容是否变化
   if (currentBlockData && currentBlockData.content === newBlockData.content) {
     console.log('No changes detected');
-    return;
   }
 
   // 更新数据

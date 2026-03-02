@@ -35,7 +35,7 @@ This plugin serves as the fourth plugin in the **Embed Series**, aiming to provi
 - [x] Edit in Tab/Dialog
 - [x] Custom Snippets
 - [x] Support SiYuan block in Excalidraw
-- [x] Markdown
+- [x] Markdown (include LaTeX math formulas, code block, mermaid, graphviz, flowchart)
 
 > If you have additional feature requests or suggestions, feel free to [open an issue on GitHub](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues) or [post in the SiYuan community](https://ld246.com/article/1763408501738) to request support for additional features.
 

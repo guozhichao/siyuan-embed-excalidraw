@@ -49,7 +49,7 @@
 - [x] Tab/Dialog窗口编辑
 - [x] 自定义代码片段
 - [x] 支持Excalidraw中显示思源文档内容
-- [x] Markdown
+- [x] Markdown (包括LaTeX公式、代码块、mermaid、graphviz、flowchart)
 
 > 如有更多需求/建议欢迎[在GitHub仓库中提issue](https://github.com/YuxinZhaozyx/siyuan-embed-excalidraw/issues)或[在思源笔记社区中发帖](https://ld246.com/article/1763408501738)
 
