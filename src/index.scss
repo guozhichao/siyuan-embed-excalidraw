@@ -51,7 +51,7 @@
     }
 }
 
-html[data-theme-mode="dark"] img[src^="assets/excalidraw-"] {
+html[data-theme-mode="dark"] img[src^="assets/"][src*="/excalidraw-"] {
     filter: invert(93%) hue-rotate(180deg);
 }
 
