@@ -82,6 +82,9 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v1.0.1
+    + Fix: Image stored in subdirectory of assets directory didn't show edit button
+    + Fix: fail to enter excalidraw interface in non-localhost environment
 + v1.0.0
     + Feature: Markdown
     + Optimize: Redo the SiYuan block embedding function
