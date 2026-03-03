@@ -68,7 +68,10 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 **Excalidraw Snippets:** Create CSS/JS code snippets (do not enable) in the code snippet editor in SiYuan, then select the code snippet enabled in Excalidraw in the plugin settings to implement custom functionality and styles. You can also find code snippets in the [Excalidraw Code Snippet Marketplace](https://ld246.com/article/1764004088153).
 
-**Embedding SiYuan Content:** Click the button on the left side of the SiYuan document/block, click `Copy - Copy block hyperlink`, and get a link starting with `siyuan://blocks/`. In Excalidraw, click `Embed Web Page`, paste the link, and the SiYuan content will be embedded in Excalidraw.
+**Embedding SiYuan Content:**
+
++ Method1: Hold the left button of the SiYuan block / document in the filetree, drag it to the Excalidraw window, and the SiYuan content will be embedded in Excalidraw.
++ Method2: Click the button on the left side of the SiYuan document/block, click `Copy - Copy block hyperlink`, and get a link starting with `siyuan://blocks/`. In Excalidraw, click `Embed Web Page`, paste the link, and the SiYuan content will be embedded in Excalidraw.
 
 **Migrating from other sources:**
 
@@ -82,6 +85,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v1.0.2
+    + Feature: able to drag and drop SiYuan blocks/documents into Excalidraw
 + v1.0.1
     + Fix: Image stored in subdirectory of assets directory didn't show edit button
     + Fix: fail to enter excalidraw interface in non-localhost environment

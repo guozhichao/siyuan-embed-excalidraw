@@ -786,3 +786,56 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
     if (!saveStatus.saving && !window.excalidrawAPI.getAppState().activeEmbeddable) save("save");
   }
 });
+
+window.addEventListener('drop', (event: DragEvent) => {
+  const dragElement: HTMLElement | null = window.parent?.siyuan?.dragElement;
+  if (dragElement) {
+    let blockId = (dragElement.querySelector('.protyle-wysiwyg--select[data-node-id]') as HTMLElement)?.getAttribute('data-node-id');
+    if (!blockId && dragElement.nodeName === 'DIV' && dragElement.childNodes.length === 1 && dragElement.firstChild?.nodeName === '#text') {
+      blockId = dragElement.textContent;
+    }
+    if (blockId) {
+      const elementId = nanoid();
+      const appState = window.excalidrawAPI.getAppState();
+      const { x, y } = viewportCoordsToSceneCoords(
+        { clientX: event.clientX, clientY: event.clientY },
+        appState,
+      );
+
+      // 创建 Markdown embeddable 元素
+      const newElement = {
+        id: elementId,
+        type: 'embeddable',
+        x,
+        y,
+        width: 300,
+        height: 185,
+        angle: 0,
+        strokeColor: '#1e1e1e',
+        backgroundColor: 'transparent',
+        fillStyle: 'solid',
+        strokeWidth: 2,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        index: 'aO',
+        roundness: {
+          type: 3,
+        },
+        seed: Math.floor(Math.random() * 10000),
+        version: 1,
+        versionNonce: Math.floor(Math.random() * 10000),
+        isDeleted: false,
+        boundElements: [],
+        updated: Date.now(),
+        link: `siyuan://blocks/${blockId}`,
+        locked: false,
+      };
+
+      const sceneElements = window.excalidrawAPI.getSceneElements();
+      window.excalidrawAPI.updateScene({ elements: [...sceneElements, newElement] });
+    }
+  }
+});
