@@ -1,5 +1,6 @@
 import { snapdom } from '@zumer/snapdom';
 import { processArraySequentially } from '../../src/utils/task';
+import CryptoJS from 'crypto-js';
 
 /**
  * 判断元素是否需要 iframe 捕获处理
@@ -196,23 +197,14 @@ export function replaceIframesWithImages(
   return { elements: processedElements, files: { ...files, ...newFiles } };
 }
 
-export async function computeHash(str: string): Promise<string> {
-  // 1. 将字符串编码为 Uint8Array
-  const msgBuffer = new TextEncoder().encode(str);
-
-  // 2. 计算哈希 (返回 ArrayBuffer)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-
-  // 3. 将 ArrayBuffer 转换为十六进制字符串
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
+export function computeHash(str: string): string {
+  const hashHex = CryptoJS.SHA256(str).toString();
   return hashHex;
 }
 
 const CACHE_VERSION = 1;
 export async function putIframeCacheMap(imageURL: string, iframeCacheMap: Map<string, IframeCache>) {
-  const imageHash = await computeHash(imageURL);
+  const imageHash = computeHash(imageURL);
   const cacheData = {
     cacheVersion: CACHE_VERSION,
     imageURL: imageURL,
@@ -231,7 +223,7 @@ export async function putIframeCacheMap(imageURL: string, iframeCacheMap: Map<st
 }
 
 export async function getIframeCacheMap(imageURL: string): Promise<Map<string, IframeCache>> {
-  const imageHash = await computeHash(imageURL);
+  const imageHash = computeHash(imageURL);
   const response = await fetch('/api/file/getFile', {
     method: 'POST',
     body: JSON.stringify({
