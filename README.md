@@ -85,6 +85,8 @@ The label of an Excalidraw image block can be configured in the plugin settings.
 
 ## Changelog
 
++ v1.0.3
+    + Optimize: support full save interval lower than 5s
 + v1.0.2
     + Feature: able to drag and drop SiYuan blocks/documents into Excalidraw
 + v1.0.1

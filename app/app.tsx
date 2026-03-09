@@ -48,7 +48,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const langCode = urlParams.get('lang') || 'en';
 const enableAutoSave = urlParams.get('enableAutoSave') === 'true';
 const autoSaveInterval = Math.max(parseInt(urlParams.get('autoSaveInterval') || '0') * 1000, 300);
-const fullSaveDelay = Math.max(parseInt(urlParams.get('fullSaveDelay') || '0') * 1000, 5000);
+const fullSaveDelay = Math.max(parseInt(urlParams.get('fullSaveDelay') || '0') * 1000, 300);
 let saveStatus = {
   fullSave: true,
   saving: false,

@@ -335,7 +335,7 @@ export default class ExcalidrawPlugin extends Plugin {
         direction: "column",
         description: this.i18n.autoSaveIntervalDescription,
         createActionElement: async () => {
-          return HTMLToElement(`<input type="number" class="b3-text-field fn__flex-center" data-type="autoSaveInterval" min="0" value="${this.data[STORAGE_NAME].autoSaveInterval}">`);
+          return HTMLToElement(`<input type="number" class="b3-text-field fn__flex-center" data-type="autoSaveInterval" min="0" step="0.5" value="${this.data[STORAGE_NAME].autoSaveInterval}">`);
         },
       },
       {
@@ -343,7 +343,7 @@ export default class ExcalidrawPlugin extends Plugin {
         direction: "column",
         description: this.i18n.fullSaveDelayDescription,
         createActionElement: async () => {
-          return HTMLToElement(`<input type="number" class="b3-text-field fn__flex-center" data-type="fullSaveDelay" min="3" value="${this.data[STORAGE_NAME].fullSaveDelay}">`);
+          return HTMLToElement(`<input type="number" class="b3-text-field fn__flex-center" data-type="fullSaveDelay" min="0" step="0.5" value="${this.data[STORAGE_NAME].fullSaveDelay}">`);
         },
       },
       {
