@@ -26,6 +26,29 @@ const isOnlyMeta = (event: KeyboardEvent | MouseEvent) => {
     }
 };
 
+// Mac，Windows 快捷键展示
+export const updateHotkeyTip = (hotkey: string) => {
+    if (!hotkey || isMac()) {
+        return hotkey;
+    }
+    const keys = [];
+    if ((hotkey.indexOf("⌘") > -1 || hotkey.indexOf("⌃") > -1)) keys.push("Ctrl");
+    if (hotkey.indexOf("⇧") > -1) keys.push("Shift");
+    if (hotkey.indexOf("⌥") > -1) keys.push("Alt");
+
+    // 不能去最后一个，需匹配 F2
+    const lastKey = hotkey.replace(/[⌘⇧⌥⌃]/g, "");
+    if (lastKey) {
+        keys.push({
+            "⇥": "Tab",
+            "⌫": "Backspace",
+            "⌦": "Delete",
+            "↩": "Enter"
+        }[lastKey] || lastKey);
+    }
+    return keys.join("+");
+};
+
 const getFunctionKey = () => {
     const fData: { [key: number]: string } = {};
     for (let i = 1; i <= 32; i++) {
